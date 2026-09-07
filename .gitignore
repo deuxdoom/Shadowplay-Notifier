@@ -17,3 +17,7 @@ test/shot_*.png
 test/live_*.png
 test/layout_*.txt
 test/monitor_rect.txt
+
+# 로컬 Claude 지침과 기억
+/.[cC][lL][aA][uU][dD][eE]/
+/[cC][lL][aA][uU][dD][eE].[mM][dD]
