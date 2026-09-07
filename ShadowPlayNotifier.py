@@ -1,0 +1,105 @@
+#!/usr/bin/env python3
+"""ShadowPlay Notifier 진입점입니다.
+
+ShadowPlay(NVIDIA App) 녹화 상태를 감시해 보조 디스플레이에 표시합니다.
+설정을 읽어 창을 만들고, 감시 스레드와 화면을 이어 붙이는 일만 합니다.
+실제 동작은 component 폴더의 모듈들이 나누어 맡습니다.
+"""
+
+import sys
+import tkinter as tk
+import traceback
+
+from component import instance, version
+from component.app import MonitorApp
+from component.config import build_settings, load_config, parse_args
+from component.display import enable_dpi_awareness, window_position
+from component.paths import install_excepthook, log
+from component.theme import C_BG, C_MUTED, WIN_H, WIN_W
+from component.watcher import WatchSupervisor
+
+
+def place_window(root, settings):
+    """설정에 따라 창을 놓을 자리를 정합니다."""
+    spot = window_position(settings["monitor"])
+    if spot is None:
+        spot = (max(0, (root.winfo_screenwidth() - WIN_W) // 2),
+                max(0, (root.winfo_screenheight() - WIN_H) // 2))
+    root.geometry("%dx%d+%d+%d" % (WIN_W, WIN_H, spot[0], spot[1]))
+    log("창 배치: %dx%d+%d+%d (monitor=%d)"
+        % (WIN_W, WIN_H, spot[0], spot[1], settings["monitor"]))
+
+
+def main(argv=None):
+    install_excepthook()
+    argv = sys.argv[1:] if argv is None else argv
+
+    # 창이 둘 뜨면 같은 폴더를 두 번 감시하면서 로그와 알림음도 겹칩니다.
+    if not instance.claim():
+        log("[중복 실행] 이미 실행 중이므로 새 창을 띄우지 않습니다.")
+        if not instance.focus_existing(version.title()):
+            instance.tell_already_running(version.APP_NAME)
+        return 1
+
+    settings = build_settings(load_config(), parse_args(argv))
+
+    enable_dpi_awareness()
+    root = tk.Tk()
+    root.title(version.title())
+    root.configure(bg=C_BG)
+    root.resizable(False, False)
+    # 배율에 상관없이 960x640 안에서 같은 배치가 나오도록 고정합니다.
+    root.tk.call("tk", "scaling", 96.0 / 72.0)
+
+    place_window(root, settings)
+    if settings["topmost"]:
+        root.attributes("-topmost", True)
+    if settings["borderless"]:
+        root.overrideredirect(True)
+
+    def tk_error(exc, value, tb):
+        log("[UI 예외] " + "".join(
+            traceback.format_exception(exc, value, tb)).rstrip())
+
+    root.report_callback_exception = tk_error
+
+    app = MonitorApp(root, settings)
+    supervisor = WatchSupervisor(app.queue.put)
+    app.settings_callback = supervisor.start
+
+    def close(_event=None):
+        app.stop_event.set()
+        supervisor.stop()
+        try:
+            root.destroy()
+        except tk.TclError:
+            pass
+
+    root.protocol("WM_DELETE_WINDOW", close)
+    app.attach_close(close)
+    if settings["borderless"]:
+        # 타이틀바가 없으면 창이 초점을 받지 못해 Esc 가 닿지 않습니다.
+        def grab_focus():
+            try:
+                root.focus_force()
+            except tk.TclError as exc:
+                log("[표시] %s" % exc)
+
+        root.after(300, grab_focus)
+
+    supervisor.start(settings)
+    app.add_log("[시작] 감시를 시작했습니다.", C_MUTED)
+    log("앱 시작 %s: dirs=%s interval=%.1f stall=%.1f"
+        % (version.VERSION, settings["dirs"], settings["interval"],
+           settings["stall"]))
+    try:
+        root.mainloop()
+    finally:
+        app.stop_event.set()
+        supervisor.stop()
+        log("앱 종료")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

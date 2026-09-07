@@ -1,6 +1,5 @@
 build/
 dist/
-*.spec
 
 __pycache__/
 *.py[cod]
@@ -8,6 +7,10 @@ __pycache__/
 # 실행하면서 생기는 사용자 파일
 config.json
 monitor.log
+
+# 아이콘 원본은 저장소에 올리지 않습니다. 빌드할 때 프로젝트 루트에 두면
+# ShadowPlayNotifier.spec 이 알아서 EXE 아이콘으로 넣습니다.
+*.ico
 
 # 테스트 도구가 남기는 캡처와 측정 결과
 test/shot_*.png

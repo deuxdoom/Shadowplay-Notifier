@@ -1,3 +1,6 @@
+- [작업 상태와 다음 할 일](project-status.md) — 1.0.0 커밋을 마쳤고 태그와 배포본은 사용자가 올린다. 새 세션은 여기부터 읽는다.
 - [메모리 저장 위치](memory-location.md) — 기억은 전역 폴더가 아니라 이 프로젝트 안에 남긴다.
 - [보조 디스플레이 좌표](secondary-display.md) — Hagibis 패널은 1번 모니터, 물리 원점 (3840, 1520), 정확히 960x640.
 - [윈도우 GUI 검증 함정](windows-gui-test-gotchas.md) — 배치 파일 인코딩, pythonw 표준 출력, 캡처 좌표 배율 문제.
+- [ShadowPlay 는 mp4 에 직접 기록](shadowplay-writes-mp4-directly.md) — 임시 파일이 없어서, 중단은 stall 대신 파일이 닫히는 잠금 신호로 잡는다.
+- [tkinter·PyInstaller 함정](tk-and-pyinstaller-gotchas.md) — 아이콘이 창 위치를 날리고, 전체화면은 주 모니터로 가며, onefile 은 두 프로세스다.

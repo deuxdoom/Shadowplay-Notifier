@@ -33,7 +33,7 @@ New-Item -ItemType Directory -Path $game -Force | Out-Null
 $file = Join-Path $game "Onimusha 2026.09.07 - 12.00.00.04.DVR.tmp"
 
 $arguments = @(
-    ('"{0}"' -f (Join-Path $root "shadowplay_notifier.py")),
+    ('"{0}"' -f (Join-Path $root "ShadowPlayNotifier.py")),
     "--dir", ('"{0}"' -f $temp),
     "--interval", $Interval, "--stall", $Stall,
     "--monitor", $Monitor, "--borderless", "--no-beep"

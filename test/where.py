@@ -3,9 +3,10 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import shadowplay_notifier as sn  # noqa: E402
+from component.display import enable_dpi_awareness, window_position  # noqa: E402
+from component.theme import WIN_H, WIN_W  # noqa: E402
 
-sn.enable_dpi_awareness()
+enable_dpi_awareness()
 index = int(sys.argv[1]) if len(sys.argv) > 1 else 1
-spot = sn.window_position(index) or (0, 0)
-print("%d %d %d %d" % (spot[0], spot[1], sn.WIN_W, sn.WIN_H))
+spot = window_position(index) or (0, 0)
+print("%d %d %d %d" % (spot[0], spot[1], WIN_W, WIN_H))
