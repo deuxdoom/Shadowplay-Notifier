@@ -73,10 +73,14 @@ v1.0.0 코드가 완성되어 있고, 빠른 감지와 중복 실행 방지까�
 - 2026-09-07 에 사용자가 커밋하라고 지시해서, GUI 전환 이후의 모든 작업을 커밋
   하나로 묶었습니다. 진입점 이름 변경(`shadowplay_notifier.py` ->
   `ShadowPlayNotifier.py`)과 `build.bat` 삭제도 함께 들어갔습니다.
-- 저장소 주소는 `https://github.com/deuxdoom/Shadowplay-Notifier` 이고 공개로 만들
-  예정입니다. **remote 는 아직 설정하지 않았고 push 도 하지 않았습니다.**
+- 2026-09-07 에 `origin` 을 `https://github.com/deuxdoom/Shadowplay-Notifier.git`
+  으로 등록하고 `main` 을 push 했습니다. 인증은 Git Credential Manager 에 저장된
+  `deuxdoom` 자격 증명을 씁니다. `gh` 명령줄 도구는 이 PC 에 설치되어 있지 않습니다.
 - **v1.0.0 태그와 zip 배포본은 사용자가 직접 만들어 올립니다.** 대신 하지 마십시오.
 - 앞으로도 push 는 사용자가 말할 때만 합니다.
+- 이 저장소는 공개이고 `.claude` 폴더도 함께 올라갑니다. 그러므로 작업 지침과
+  기억에 윈도우 사용자 이름이 든 절대 경로를 적지 말고 `%USERPROFILE%` 처럼
+  씁니다. 한 번 push 하면 기록에서 지우기가 번거롭습니다.
 
 ## 확인이 끝난 것들 (다시 하지 않아도 됩니다)
 
