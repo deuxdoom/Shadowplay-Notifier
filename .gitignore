@@ -1,0 +1,16 @@
+build/
+dist/
+*.spec
+
+__pycache__/
+*.py[cod]
+
+# 실행하면서 생기는 사용자 파일
+config.json
+monitor.log
+
+# 테스트 도구가 남기는 캡처와 측정 결과
+test/shot_*.png
+test/live_*.png
+test/layout_*.txt
+test/monitor_rect.txt

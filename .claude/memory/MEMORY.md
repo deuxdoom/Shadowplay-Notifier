@@ -1,0 +1,3 @@
+- [메모리 저장 위치](memory-location.md) — 기억은 전역 폴더가 아니라 이 프로젝트 안에 남긴다.
+- [보조 디스플레이 좌표](secondary-display.md) — Hagibis 패널은 1번 모니터, 물리 원점 (3840, 1520), 정확히 960x640.
+- [윈도우 GUI 검증 함정](windows-gui-test-gotchas.md) — 배치 파일 인코딩, pythonw 표준 출력, 캡처 좌표 배율 문제.
