@@ -3,7 +3,19 @@
 이 파일의 형식은 [Keep a Changelog 1.1.0](https://keepachangelog.com/ko/1.1.0/)을
 따르며, 버전은 [유의적 버전 2.0.0](https://semver.org/lang/ko/)을 따릅니다.
 
-## [미배포]
+## [1.0.1] - 2026-09-08
+
+### 변경
+
+- 실행 파일의 아이콘을 새로운 디자인으로 바꾸었습니다.
+- 환경설정 창의 타이틀바에도 같은 아이콘이 나옵니다. 작업 표시줄에서 창을 고를
+  때 어느 프로그램의 창인지 한눈에 알아볼 수 있습니다.
+
+### 수정
+
+- 다른 해상도의 모니터에서 전체화면으로 전환하면 녹화 정보는 작게 남고 로그와
+  빈 자리만 커지던 문제를 고쳤습니다. 960x640 화면을 기준으로 배너, 녹화 정보,
+  로그, 글자와 아이콘을 함께 확대해서 화면 구성의 비율을 그대로 지킵니다.
 
 ## [1.0.0] - 2026-09-07
 
@@ -61,5 +73,5 @@ NVIDIA App 의 녹화 상태 표시 아이콘이 간헐적으로 영상에 그�
 - 창 오른쪽 아래에 버전을 표시합니다. 윈도우 파일 속성 창에서도 버전과 만든
   사람을 확인할 수 있습니다.
 
-[미배포]: https://github.com/deuxdoom/Shadowplay-Notifier/compare/v1.0.0...HEAD
+[1.0.1]: https://github.com/deuxdoom/Shadowplay-Notifier/releases/tag/v1.0.1
 [1.0.0]: https://github.com/deuxdoom/Shadowplay-Notifier/releases/tag/v1.0.0
