@@ -7,7 +7,7 @@
 --clean 을 붙이는 이유는, 그것이 없으면 PyInstaller 가 이전에 만든 EXE 를 그대로
 재사용해서 바뀐 아이콘이 조용히 무시되기 때문입니다.
 
-app.ico 파일이 프로젝트 폴더에 있으면 EXE 아이콘으로 넣고, 없으면 아이콘 없이
+appicon.ico 파일이 프로젝트 폴더에 있으면 EXE 아이콘으로 넣고, 없으면 아이콘 없이
 빌드합니다. 아이콘 원본은 저장소에 올리지 않습니다.
 """
 
@@ -56,7 +56,7 @@ def version_resource(version, author):
 
 VERSION = read_meta("VERSION", "0.0.0")
 AUTHOR = read_meta("AUTHOR", "deuxdoom")
-ICON = os.path.join(SPECPATH, "app.ico")
+ICON = os.path.join(SPECPATH, "appicon.ico")
 
 a = Analysis(
     [os.path.join(SPECPATH, "ShadowPlayNotifier.py")],

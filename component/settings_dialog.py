@@ -31,6 +31,9 @@ class SettingsDialog:
         self.top.configure(bg=C_BG)
         self.top.resizable(False, False)
         self.top.transient(parent)
+        # 창 아이콘은 자리를 잡기 전에 달아야 합니다. Tk 가 아이콘을 붙이면서
+        # 창을 다시 만드는 일이 있는데, 그러면 뒤따르는 geometry 가 날아갑니다.
+        self._set_icon()
 
         self.f_label = pick_font(self.top, UI_FAMILIES, 12)
         self.f_field = pick_font(self.top, UI_FAMILIES, 13)
@@ -49,6 +52,26 @@ class SettingsDialog:
         self.top.focus_force()
 
     # ------------------------------------------------------------ 구성
+
+    def _set_icon(self):
+        """타이틀바에 프로그램 아이콘을 답니다.
+
+        ``iconbitmap`` 은 ico 파일 경로를 받는데, onefile 로 묶으면 그 파일이
+        따라가지 않는 데다 창까지 다시 만들어 위치를 잃습니다. 그래서 PNG 를
+        담아 둔 ``icons.APP_*`` 로 ``iconphoto`` 를 씁니다. 여러 크기를 함께
+        넘기면 윈도우가 타이틀바와 작업 전환 화면에 맞는 것을 골라 씁니다.
+
+        본 창은 타이틀바가 없는 것이 기본이므로 아이콘을 달지 않습니다.
+        여기서도 ``default=False`` 로 이 창에만 적용합니다.
+        """
+        try:
+            # PhotoImage 는 참조를 잃으면 지워지므로 창이 살아 있는 동안 붙듭니다.
+            self.app_icons = [tk.PhotoImage(data=getattr(icons, "APP_%d" % size))
+                              for size in icons.APP_SIZES]
+            self.top.iconphoto(False, *self.app_icons)
+        except tk.TclError as error:
+            self.app_icons = []
+            log("[설정] 창 아이콘을 달지 못했습니다: %s" % error)
 
     def _place(self):
         """본 창 한가운데에 놓되, 그 화면 밖으로 나가지 않게 다듬습니다."""

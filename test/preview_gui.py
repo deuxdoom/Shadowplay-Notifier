@@ -1,11 +1,12 @@
 r"""보조 디스플레이에 창을 강제로 띄워 960x640 레이아웃을 눈으로 확인합니다.
 
-실행: python test\preview_gui.py [rec|idle|long] [모니터번호] [표시시간초] [nb]
+실행: python test\preview_gui.py [rec|idle|long] [모니터번호] [표시시간초] [nb] [full]
   rec  : 녹화중 화면 (기본값)
   idle : 대기중 화면
   long : 폴더 이름이 길어 글자 크기가 줄어드는 경우
 모니터 번호는 왼쪽 위 좌표 순서이며 기본값은 1(보조 디스플레이)입니다.
 네 번째 인자로 nb 를 주면 타이틀바 없는 상태를 확인합니다.
+full 을 주면 선택한 모니터에서 전체화면으로 전환한 뒤 캡처합니다.
 레이아웃 수치는 test\layout_<모드>.txt 로 남습니다.
 pythonw 로 실행하면 표준 출력이 없으므로 파일 기록만 남습니다.
 """
@@ -25,6 +26,7 @@ MODE = sys.argv[1] if len(sys.argv) > 1 else "rec"
 MONITOR = int(sys.argv[2]) if len(sys.argv) > 2 else 1
 SECONDS = float(sys.argv[3]) if len(sys.argv) > 3 else 12.0
 BORDERLESS = "nb" in sys.argv[4:]
+FULLSCREEN = "full" in sys.argv[4:]
 HERE = os.path.dirname(os.path.abspath(__file__))
 WATCH_DIR = r"E:\shadowplay record"
 
@@ -52,11 +54,6 @@ root.tk.call("tk", "scaling", 96.0 / 72.0)
 say("모니터 목록:", display.monitor_rects())
 spot = display.window_position(MONITOR) or (40, 40)
 say("표시 위치:", spot, "/ 모드:", MODE)
-
-# 캡처 도구가 쓸 물리 좌표를 남깁니다. 화면 캡처는 배율과 무관한
-# 물리 좌표를 쓰므로 DPI 인식이 켜진 이쪽에서 알려 주어야 합니다.
-with open(os.path.join(HERE, "monitor_rect.txt"), "w", encoding="utf-8") as fp:
-    fp.write("%d %d %d %d\n" % (spot[0], spot[1], theme.WIN_W, theme.WIN_H))
 
 root.geometry("%dx%d+%d+%d" % (theme.WIN_W, theme.WIN_H, spot[0], spot[1]))
 if BORDERLESS:
@@ -92,6 +89,14 @@ app.add_log("[시작] OnimushaWotS\\Onimusha 2026.09.07 - 10.02.11.DVR.tmp",
 app.add_log("[오류] 감시 폴더를 읽는 중 오류가 발생했습니다", theme.C_YELLOW)
 app.queue.put({"kind": "health", "missing": []})
 root.update()
+if FULLSCREEN:
+    app.toggle_fullscreen()
+    root.update()
+
+# 전체화면 전환 뒤 실제 물리 좌표를 써야 4K 화면도 잘리지 않고 캡처됩니다.
+with open(os.path.join(HERE, "monitor_rect.txt"), "w", encoding="utf-8") as fp:
+    fp.write("%d %d %d %d\n" % (root.winfo_x(), root.winfo_y(),
+                                 root.winfo_width(), root.winfo_height()))
 
 lines = ["창 크기: %dx%d" % (root.winfo_width(), root.winfo_height())]
 for child in root.winfo_children():
@@ -99,10 +104,10 @@ for child in root.winfo_children():
         child.winfo_class(), child.winfo_y(), child.winfo_height(),
         child.winfo_width()))
 bottom = max(c.winfo_y() + c.winfo_height() for c in root.winfo_children())
-lines.append("가장 아래 끝: %d / %d (여유 %d)" % (bottom, theme.WIN_H,
-                                                 theme.WIN_H - bottom))
+height = root.winfo_height()
+lines.append("가장 아래 끝: %d / %d (여유 %d)" % (bottom, height, height - bottom))
 clipped = [c.winfo_class() for c in root.winfo_children()
-           if c.winfo_height() <= 1 or c.winfo_y() + c.winfo_height() > theme.WIN_H]
+           if c.winfo_height() <= 1 or c.winfo_y() + c.winfo_height() > height]
 lines.append("잘린 요소: %s" % (", ".join(clipped) or "없음"))
 report = "\n".join(lines)
 say(report)

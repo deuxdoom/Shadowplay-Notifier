@@ -52,6 +52,9 @@ class MonitorApp:
         self.last_update = "--:--:--"
         self.warning = ""
         self.log_rows = deque(maxlen=LOG_ROWS)
+        self._layout_size = None
+        self._scale_x = self._scale_y = 1.0
+        self._cell_holders = []
 
         self._init_fonts()
         self._build_banner()
@@ -61,6 +64,7 @@ class MonitorApp:
         self._show_idle()
         self._refresh_status()
         self._enable_drag()
+        self.root.bind("<Configure>", self._resize_layout, add="+")
 
         self.root.after(50, self._pulse)
         self.root.after(100, self._drain)
@@ -68,20 +72,39 @@ class MonitorApp:
     # ------------------------------------------------------------ 구성
 
     def _init_fonts(self):
-        self.f_banner = pick_font(self.root, UI_FAMILIES, 48, "bold")
-        self.f_banner_sub = pick_font(self.root, MONO_FAMILIES, 38, "bold")
+        self._base_fonts = []
+
+        def font(families, size, weight="normal"):
+            chosen = pick_font(self.root, families, size, weight)
+            self._base_fonts.append((chosen, size, chosen.metrics("linespace")))
+            return chosen
+
+        self.f_banner = font(UI_FAMILIES, 48, "bold")
+        self.f_banner_sub = font(MONO_FAMILIES, 38, "bold")
         # 폴더 이름 길이에 맞춰 골라 쓰는 크기들입니다. 첫 번째가 기본입니다.
-        self.f_folder_sizes = [pick_font(self.root, UI_FAMILIES, size, "bold")
+        self.f_folder_sizes = [font(UI_FAMILIES, size, "bold")
                                for size in (42, 36, 30, 24)]
         self.f_folder = self.f_folder_sizes[0]
-        self.f_value = pick_font(self.root, UI_FAMILIES, 22)
-        self.f_value_mono = pick_font(self.root, MONO_FAMILIES, 38)
-        self.f_sub_mono = pick_font(self.root, MONO_FAMILIES, 28)
-        self.f_label = pick_font(self.root, UI_FAMILIES, 13)
-        self.f_summary = pick_font(self.root, UI_FAMILIES, 15)
-        self.f_mono = pick_font(self.root, MONO_FAMILIES, 12)
-        self.f_status = pick_font(self.root, UI_FAMILIES, 11)
-        self.f_version = pick_font(self.root, UI_FAMILIES, 10)
+        self.f_value = font(UI_FAMILIES, 22)
+        self.f_value_mono = font(MONO_FAMILIES, 38)
+        self.f_sub_mono = font(MONO_FAMILIES, 28)
+        self.f_label = font(UI_FAMILIES, 13)
+        self.f_summary = font(UI_FAMILIES, 15)
+        self.f_mono = font(MONO_FAMILIES, 12)
+        self.f_status = font(UI_FAMILIES, 11)
+        self.f_version = font(UI_FAMILIES, 10)
+        # 각 행의 기준 높이는 96 DPI 글꼴 실측치입니다. 세로 화면에서도 정보가
+        # 위쪽에 몰리지 않도록 글자 크기와 별도로 행 간격을 비례 배분합니다.
+        label_h = self.f_label.metrics("linespace")
+        self._detail_rows = (
+            8 + label_h + self.f_folder.metrics("linespace"),
+            8 + label_h + self.f_value_mono.metrics("linespace"),
+            8 + label_h + self.f_sub_mono.metrics("linespace"),
+            6 + self.f_summary.metrics("linespace"),
+        )
+        self._log_title_h = label_h
+        self._log_row_h = self.f_mono.metrics("linespace")
+        self._status_h = self.f_status.metrics("linespace")
 
     def _label(self, parent, text, font, bg, fg):
         """줄 높이를 예측할 수 있도록 여백과 테두리를 모두 없앤 라벨을 만듭니다."""
@@ -114,6 +137,8 @@ class MonitorApp:
             "close": (tk.PhotoImage(data=icons.CLOSE_DIM),
                       tk.PhotoImage(data=icons.CLOSE_LIT)),
         }
+        self._base_images = self.images
+        self._icon_size = self.images["close"][0].width()
         self.buttons = {
             name: self.banner.create_image(0, 12, anchor="ne",
                                            image=self.images[name][0])
@@ -131,17 +156,23 @@ class MonitorApp:
         """전체화면으로 넓어져도 버튼이 오른쪽 위에 붙어 있도록 옮깁니다."""
         width = self.banner.winfo_width()
         self._banner_width = width if width > 1 else WIN_W
+        sx, sy = self._scale_x, self._scale_y
+        radius = 34 * min(sx, sy)
+        self.banner.coords(self.dot, 90 * sx - radius, 70 * sy - radius,
+                           90 * sx + radius, 70 * sy + radius)
+        self.banner.coords(self.banner_text, 152 * sx, 70 * sy)
         for index, name in enumerate(BUTTON_ORDER):
             self.banner.coords(self.buttons[name],
-                               self._banner_width - 12 - index * BUTTON_W, 12)
-        self.banner.coords(self.banner_sub, self._banner_width - 36, 70)
+                               self._banner_width - (12 + index * BUTTON_W) * sx,
+                               12 * sy)
+        self.banner.coords(self.banner_sub, self._banner_width - 36 * sx, 70 * sy)
 
     def _corner_hit(self, x, y):
-        if y > BUTTON_ZONE_H:
+        if y < 0 or y > BUTTON_ZONE_H * self._scale_y:
             return None
         for index, name in enumerate(BUTTON_ORDER):
-            right = self._banner_width - 4 - index * BUTTON_W
-            if right - BUTTON_W <= x < right:
+            right = self._banner_width - (4 + index * BUTTON_W) * self._scale_x
+            if right - BUTTON_W * self._scale_x <= x < right:
                 return name
         return None
 
@@ -177,6 +208,7 @@ class MonitorApp:
         pad = (24, 12) if col == 0 else (12, 24)
         holder = tk.Frame(parent, bg=C_BG, bd=0, highlightthickness=0)
         holder.grid(row=row, column=col, sticky="we", padx=pad, pady=(8, 0))
+        self._cell_holders.append((holder, pad))
         self._label(holder, title, self.f_label, C_BG, C_MUTED).pack(fill="x")
         value = self._label(holder, "—", value_font, C_BG, color)
         value.pack(fill="x")
@@ -185,6 +217,7 @@ class MonitorApp:
     def _build_detail(self):
         body = tk.Frame(self.root, bg=C_BG, height=H_DETAIL, bd=0,
                         highlightthickness=0)
+        self.detail = body
         body.pack(side="top", fill="x")
         # 자식이 grid 로 배치되므로 grid_propagate 를 꺼야 높이가 고정됩니다.
         body.grid_propagate(False)
@@ -205,19 +238,21 @@ class MonitorApp:
     def _build_log(self):
         frame = tk.Frame(self.root, bg=C_PANEL, height=H_LOG, bd=0,
                          highlightthickness=0)
-        # 전체화면으로 넓어지면 로그 칸이 남는 공간을 가져가도록 둡니다.
-        frame.pack(side="top", fill="both", expand=True, padx=16, pady=(4, 0))
+        self.log_frame = frame
+        # 전체화면에서는 모든 영역을 함께 확대합니다. 로그만 expand=True 로
+        # 남는 공간을 가져가거나 H_LOG 픽셀로 고정하면 전체 화면의 비율이 깨집니다.
+        frame.pack(side="top", fill="x", padx=16, pady=(4, 0))
         frame.pack_propagate(False)
-        self._label(frame, "이벤트 로그", self.f_label, C_PANEL, C_MUTED).pack(
-            fill="x", padx=12, pady=(6, 2))
+        self.log_title = self._label(frame, "이벤트 로그", self.f_label,
+                                     C_PANEL, C_MUTED)
         self.log_labels = []
         for _ in range(LOG_ROWS):
             row = self._label(frame, "", self.f_mono, C_PANEL, C_MUTED)
-            row.pack(fill="x", padx=12)
             self.log_labels.append(row)
 
     def _build_status(self):
         row = tk.Frame(self.root, bg=C_BG, bd=0, highlightthickness=0)
+        self.status_row = row
         row.pack(side="bottom", fill="x", padx=18, pady=(3, 5))
         self.status = self._label(row, "", self.f_status, C_BG, C_MUTED)
         self.status.pack(side="left", fill="x", expand=True)
@@ -265,6 +300,72 @@ class MonitorApp:
         return "break"
 
     # ------------------------------------------------------------ 창 상태
+
+    def _resize_layout(self, event):
+        """960x640 의 영역 비율을 유지하며 실제 창 크기에 맞춥니다.
+
+        좌우·상하 간격은 각 축의 배율을 쓰고, 글자·원·아이콘은 작은 배율을
+        공통으로 써서 화면비가 달라도 찌그러지거나 잘리지 않게 합니다.
+        매번 기준값에서 계산해야 전체화면 전환을 반복해도 반올림이 누적되지 않습니다.
+        Tk 전체의 scaling 은 환경설정 창까지 바꾸므로 건드리지 않습니다.
+        """
+        size = (event.width, event.height)
+        if event.widget is not self.root or min(size) <= 1 or size == self._layout_size:
+            return
+        self._layout_size = size
+        sx, sy = event.width / WIN_W, event.height / WIN_H
+        self._scale_x, self._scale_y = sx, sy
+        scale = min(sx, sy)
+        x = lambda value: round(value * sx)
+        y = lambda value: round(value * sy)
+        for font, points, line_height in self._base_fonts:
+            # 음수 크기는 픽셀 단위입니다. 정수 pt 로 반올림하는 오차를 줄입니다.
+            if scale == 1:
+                font.configure(size=points)
+                continue
+            pixels = max(1, round(points * (96 / 72) * scale))
+            font.configure(size=-pixels)
+            # 글꼴의 픽셀 반올림으로 행보다 1~2px 커지는 경우도 보정합니다.
+            while pixels > 1 and font.metrics("linespace") > round(line_height * scale):
+                pixels -= 1
+                font.configure(size=-pixels)
+
+        self.banner.configure(height=y(H_BANNER))
+        self.detail.configure(height=y(H_DETAIL))
+        for index, height in enumerate(self._detail_rows):
+            self.detail.rowconfigure(index, minsize=y(height) if sy != 1 else 0)
+        for holder, pad in self._cell_holders:
+            holder.grid_configure(padx=tuple(x(p) for p in pad), pady=(y(8), 0))
+        self.v_summary.grid_configure(padx=x(24), pady=(y(6), 0))
+
+        self.log_frame.configure(height=y(H_LOG))
+        self.log_frame.pack_configure(padx=x(16), pady=(y(4), 0))
+        # 행 높이도 확대해야 세로로 긴 모니터에서 로그가 위에 몰리지 않습니다.
+        self.log_title.place(x=x(12), y=y(6), relwidth=1, width=-x(24),
+                             height=y(self._log_title_h))
+        for index, label in enumerate(self.log_labels):
+            label.place(x=x(12), y=y(8 + self._log_title_h + index * self._log_row_h),
+                        relwidth=1, width=-x(24), height=y(self._log_row_h))
+        self.status_row.configure(height=y(self._status_h))
+        self.status_row.pack_propagate(False)
+        self.status_row.pack_configure(padx=x(18), pady=(y(3), y(5)))
+
+        # PhotoImage 원본을 보존해 확대/복원을 반복해도 화질과 크기가 누적되지 않습니다.
+        source_size = self._base_images["close"][0].width()
+        icon_size = max(1, round(source_size * scale))
+        if icon_size != self._icon_size:
+            factor = math.gcd(icon_size, source_size)
+            self.images = {
+                name: tuple(photo.zoom(icon_size // factor).subsample(source_size // factor)
+                            for photo in pair)
+                for name, pair in self._base_images.items()
+            } if icon_size != source_size else self._base_images
+            self._icon_size = icon_size
+            for name in BUTTON_ORDER:
+                self.banner.itemconfigure(self.buttons[name],
+                                          image=self._icon_for(name, name == self._hovered))
+        self._show_folder(self._folder_text, self.v_folder.cget("fg"))
+        self._place_banner_items()
 
     def _set_window_rect(self, left, top, width, height):
         # resizable(False) 는 창 크기를 못으로 박아 두므로 잠시 풀고 옮깁니다.
@@ -356,9 +457,10 @@ class MonitorApp:
 
     def _show_folder(self, text, color):
         """폴더 이름이 길면 자르지 않고 글자 크기를 줄여서 끝까지 보여 줍니다."""
+        self._folder_text = text
         chosen = self.f_folder_sizes[-1]
         for font in self.f_folder_sizes:
-            if font.measure(text) <= FOLDER_MAX_PX:
+            if font.measure(text) <= FOLDER_MAX_PX * self._scale_x:
                 chosen = font
                 break
         self.v_folder.config(text=ellipsize(text, 30), font=chosen, fg=color)

@@ -4,7 +4,8 @@ param(
     [string]$Mode = "rec",
     [int]$Monitor = 1,
     [int]$Seconds = 12,
-    [switch]$Borderless
+    [switch]$Borderless,
+    [switch]$Fullscreen
 )
 
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -19,7 +20,9 @@ Add-Type -AssemblyName System.Windows.Forms, System.Drawing
 # 경로에 공백이 있으므로 반드시 따옴표로 묶어서 넘겨야 합니다.
 $script = '"{0}"' -f (Join-Path $here "preview_gui.py")
 $extra = if ($Borderless) { "nb" } else { "bar" }
-$proc = Start-Process pythonw -PassThru -ArgumentList $script, $Mode, $Monitor, $Seconds, $extra
+$previewArgs = @($script, $Mode, $Monitor, $Seconds, $extra)
+if ($Fullscreen) { $previewArgs += "full" }
+$proc = Start-Process pythonw -WindowStyle Hidden -PassThru -ArgumentList $previewArgs
 Start-Sleep -Seconds 4
 
 # 화면 캡처는 물리 좌표로 동작하므로 파이썬 쪽이 남긴 좌표를 그대로 씁니다.
@@ -42,18 +45,8 @@ $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
 $graphics.CopyFromScreen($bounds.X, $bounds.Y, 0, 0, $bitmap.Size)
 $graphics.Dispose()
 
-# 캡처하는 쪽이 주 모니터 배율로 좌표를 보면 화면이 확대되어 잡히므로
-# 실제 창 크기(960x640)로 되돌립니다.
-if ($bounds.Width -ne 960 -or $bounds.Height -ne 640) {
-    $scaled = New-Object System.Drawing.Bitmap 960, 640
-    $g2 = [System.Drawing.Graphics]::FromImage($scaled)
-    $g2.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
-    $g2.DrawImage($bitmap, 0, 0, 960, 640)
-    $g2.Dispose()
-    $bitmap.Dispose()
-    $bitmap = $scaled
-    Write-Host "캡처를 960x640 으로 되돌렸습니다."
-}
+# DPI 인식이 켜진 실제 창 크기를 그대로 보존합니다. 전체화면 이미지를
+# 960x640 으로 강제 변환하면 화면비가 달라져 비례 배치 검증을 할 수 없습니다.
 $out = Join-Path $here "shot_$Mode.png"
 $bitmap.Save($out, [System.Drawing.Imaging.ImageFormat]::Png)
 $bitmap.Dispose()

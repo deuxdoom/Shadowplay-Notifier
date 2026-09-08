@@ -21,3 +21,7 @@ test/monitor_rect.txt
 # 로컬 Claude 지침과 기억
 /.[cC][lL][aA][uU][dD][eE]/
 /[cC][lL][aA][uU][dD][eE].[mM][dD]
+
+# 로컬 Codex 지침
+/AGENTS.md
+/.[cC][oO][dD][eE][xX]/

@@ -59,6 +59,13 @@ python test\trace_growth.py --dir "E:\shadowplay record" --seconds 120
 python test\test_placement.py
 ```
 
+## test_layout.py
+
+실제 Tk 위젯으로 960×640, FHD, QHD, 4K, 울트라와이드, 세로 화면 등 11개
+해상도의 영역 비율과 글자 잘림을 검사합니다. 대기·녹화·긴 폴더 이름을 확인하고,
+F11 과 확대된 전체화면 버튼으로 전환을 반복해 원래 위치·글꼴·로그 배치 복원도 봅니다.
+실행 중인 앱을 닫은 뒤 `python test/test_layout.py` 로 실행하십시오.
+
 ## preview.ps1 / preview_gui.py
 
 가짜 상태를 채운 창을 보조 디스플레이에 띄우고 그 화면을 그대로 캡처합니다.
@@ -72,6 +79,8 @@ powershell -ExecutionPolicy Bypass -File test\preview.ps1 -Mode idle -Monitor 1
 - `-Mode rec` 는 녹화중 화면, `-Mode idle` 은 대기중 화면, `-Mode long` 은 폴더
   이름이 길어서 글자 크기가 자동으로 줄어드는 경우입니다.
 - `-Borderless` 를 주면 타이틀바 없는 상태를 확인합니다.
+- `-Fullscreen -Monitor 0` 을 함께 주면 주 모니터 전체화면을 확인합니다.
+  캡처는 실제 창 해상도를 보존하므로 화면비와 글자 크기도 비교할 수 있습니다.
 - 결과는 `test\shot_<모드>.png` 와 `test\layout_<모드>.txt` 로 남습니다.
 - 화면 캡처는 배율과 무관한 물리 좌표로 동작하므로, DPI 인식을 켠 파이썬 쪽이
   `monitor_rect.txt` 에 좌표를 적어 주고 PowerShell 이 그 값을 씁니다.
