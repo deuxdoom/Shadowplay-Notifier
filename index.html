@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ShadowPlay Notifier — 녹화 감지와 다용도 월페이퍼</title>
+<meta name="description" content="NVIDIA ShadowPlay 의 녹화를 자동으로 감지해 보조 모니터에 크게 알려 주고, 녹화가 없는 동안에는 시계와 날씨, 음악, 사계절 사진을 띄우는 윈도우용 월페이퍼 앱입니다.">
+<link rel="canonical" href="https://deuxdoom.github.io/Shadowplay-Notifier/">
+<meta name="theme-color" content="#06090c">
+
+<meta property="og:type" content="website">
+<meta property="og:locale" content="ko_KR">
+<meta property="og:title" content="ShadowPlay Notifier — 녹화 감지와 다용도 월페이퍼">
+<meta property="og:description" content="녹화는 알아서 감지하고, 녹화가 없는 동안에는 시계와 날씨, 듣고 있는 음악을 보여 줍니다. 보조 모니터를 늘 켜 두어도 화면이 비지 않습니다.">
+<meta property="og:url" content="https://deuxdoom.github.io/Shadowplay-Notifier/">
+<meta property="og:image" content="https://deuxdoom.github.io/Shadowplay-Notifier/wallpaper.png">
+<meta name="twitter:card" content="summary_large_image">
+
+<link rel="icon" href="assets/appicon.svg" type="image/svg+xml">
+
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap">
+
+<style>
+/* ─────────────────────────────────────────────
+   ShadowPlay Notifier 소개 페이지
+   앱 화면의 인상(어두운 패널, 붉은 녹화 표시, 모노 레이블)을
+   그대로 옮긴 계기판 형태의 구성입니다.
+   ───────────────────────────────────────────── */
+
+*, *::before, *::after { box-sizing: border-box; }
+* { margin: 0; }
+img, svg { display: block; max-width: 100%; }
+img { height: auto; }
+[hidden] { display: none !important; }
+a { color: inherit; text-decoration: none; }
+ul { list-style: none; padding: 0; }
+button { font: inherit; color: inherit; cursor: pointer; }
+
+:root {
+  color-scheme: dark;
+  --bg: #06090c;
+  --panel: #0b1117;
+  --panel-hi: #101a21;
+  --line: #18222b;
+  --line-hi: #27343f;
+  --ink: #e6edf3;
+  --muted: #93a2b0;
+  --faint: #647380;
+  --rec: #ff3b46;
+  --cool: #79aec2;
+  --rail: 74px;
+  --shell: 1180px;
+  --pad: clamp(20px, 4.4vw, 56px);
+  --mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+}
+
+html { scroll-behavior: smooth; scroll-padding-top: 72px; }
+body {
+  font-family: Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  line-height: 1.7;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  overflow-x: hidden;
+  padding-left: var(--rail);
+  -webkit-font-smoothing: antialiased;
+}
+h1, h2, h3 { font-weight: 700; line-height: 1.26; letter-spacing: -.035em; text-wrap: balance; }
+p { text-wrap: pretty; }
+::selection { background: #ff3b4640; }
+:focus-visible { outline: 2px solid var(--rec); outline-offset: 3px; }
+
+.shell { width: min(100% - var(--pad) * 2, var(--shell)); margin-inline: auto; }
+.icon { width: 21px; height: 21px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* 앱 화면의 RECORDING · EVENT LOG 표기와 같은 결의 레이블입니다. */
+.mono { font-family: var(--mono); letter-spacing: .24em; text-transform: uppercase; font-size: 11px; color: var(--faint); }
+
+/* ── 왼쪽 세로 레일 ───────────────────────── */
+.rail {
+  position: fixed; inset: 0 auto 0 0; width: var(--rail); z-index: 60;
+  display: flex; flex-direction: column; align-items: center;
+  padding-block: 18px 20px;
+  background: var(--bg); border-right: 1px solid var(--line);
+}
+.rail-mark img { width: 34px; height: 34px; border-radius: 9px; }
+.rail-title {
+  writing-mode: vertical-rl; margin-top: 24px;
+  font-family: var(--mono); font-size: 10px; letter-spacing: .32em;
+  text-transform: uppercase; color: var(--faint); white-space: nowrap;
+}
+.rail-nav { position: absolute; top: 50%; translate: 0 -50%; display: flex; flex-direction: column; gap: 15px; align-items: center; }
+.rail-nav a { position: relative; display: grid; place-items: center; width: 26px; height: 26px; }
+.rail-nav i { width: 7px; height: 7px; border: 1px solid var(--line-hi); border-radius: 50%; transition: background .25s, border-color .25s, scale .25s; }
+.rail-nav a:hover i { border-color: var(--muted); }
+.rail-nav a.on i { background: var(--rec); border-color: var(--rec); scale: 1.15; box-shadow: 0 0 10px #ff3b4699; }
+.rail-nav span {
+  position: absolute; left: 32px; padding: 4px 9px; border: 1px solid var(--line);
+  background: var(--panel-hi); font-family: var(--mono); font-size: 10px; letter-spacing: .16em;
+  text-transform: uppercase; color: var(--muted); white-space: nowrap;
+  opacity: 0; translate: -6px 0; pointer-events: none; transition: opacity .2s, translate .2s;
+}
+.rail-nav a:hover span { opacity: 1; translate: 0 0; }
+.rail-gh { margin-top: auto; color: var(--faint); transition: color .2s; }
+.rail-gh:hover { color: var(--ink); }
+
+/* 좁은 화면에서는 레일 대신 위쪽 가로 막대를 씁니다. */
+.topbar { display: none; }
+
+/* ── 머리 화면 ────────────────────────────── */
+.hero { position: relative; border-bottom: 1px solid var(--line); overflow: hidden; }
+.hero::before {
+  content: ""; position: absolute; width: 820px; height: 600px; right: -160px; top: -220px;
+  background: radial-gradient(ellipse at center, #ff3b4616, transparent 70%); pointer-events: none;
+}
+.hero-inner { padding-block: clamp(30px, 3.4vw, 46px) 0; }
+.hero-body {
+  display: grid; grid-template-columns: minmax(0, 45fr) minmax(0, 55fr);
+  align-items: start; gap: clamp(26px, 3.4vw, 46px);
+  margin-top: clamp(24px, 2.8vw, 34px); padding-bottom: clamp(30px, 3.4vw, 46px);
+}
+.status {
+  display: inline-flex; align-items: center; gap: 10px;
+  padding: 6px 13px 6px 11px; border: 1px solid #ff3b4640; background: #ff3b460d;
+}
+.status .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--rec); box-shadow: 0 0 11px #ff3b46aa; animation: blink 1.9s ease-in-out infinite; }
+.status .mono { color: #ff838b; font-size: 10.5px; }
+@keyframes blink { 50% { opacity: .28; scale: .74; } }
+
+.hero h1 { margin-top: 20px; font-size: clamp(31px, 4.1vw, 52px); letter-spacing: -.05em; line-height: 1.2; text-wrap: initial; }
+.hero h1 em { font-style: normal; color: var(--rec); }
+.hero h1 b { font-weight: inherit; color: var(--cool); }
+.hero .lead { max-width: 34em; color: var(--muted); font-size: clamp(14.5px, 1.15vw, 16.5px); }
+
+.cta { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 28px; }
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 9px;
+  min-height: 46px; padding: 11px 20px; border: 1px solid transparent;
+  font-size: 14px; font-weight: 650; letter-spacing: -.01em;
+  transition: background .2s, border-color .2s, color .2s, box-shadow .2s;
+}
+.btn-main { background: var(--rec); color: #fff; }
+.btn-main:hover { background: #ff5158; box-shadow: 0 0 0 4px #ff3b4622; }
+.btn-sub { border-color: var(--line-hi); color: var(--muted); }
+.btn-sub:hover { border-color: var(--muted); color: var(--ink); background: #ffffff06; }
+.dlnote { margin-top: 14px; color: var(--faint); font-size: 12.5px; }
+.dlnote code { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+
+/* 모노 사양 표 — 앱 하단 상태 표시줄과 같은 읽는 맛을 냅니다. */
+.specs { margin-top: clamp(24px, 2.6vw, 32px); border-top: 1px solid var(--line); }
+.specs > div { display: flex; gap: 14px; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+.specs dt { flex: none; width: 92px; padding-top: 3px; font-family: var(--mono); font-size: 10px; letter-spacing: .16em; text-transform: uppercase; color: var(--faint); }
+.specs dd { color: var(--muted); line-height: 1.6; }
+
+/* 머리 화면의 스크린샷은 오른쪽 화면 밖으로 흘려보냅니다. */
+.hero-shot { margin-right: min(calc(var(--pad) * -1 - 46px), -20px); }
+
+/* ── 화면 액자 ────────────────────────────── */
+.frame { position: relative; border: 1px solid var(--line-hi); background: #04070a; }
+.frame::after { content: ""; position: absolute; inset: 0; box-shadow: inset 0 0 0 1px #ffffff0a; pointer-events: none; }
+.frame img { width: 100%; }
+.frame figcaption {
+  display: flex; align-items: center; gap: 9px; padding: 10px 13px;
+  border-top: 1px solid var(--line); background: var(--panel);
+}
+.frame figcaption .mono { font-size: 10px; }
+.frame figcaption .led { width: 7px; height: 7px; flex: none; border-radius: 50%; background: var(--rec); box-shadow: 0 0 9px #ff3b4688; }
+.frame.idle figcaption .led { background: var(--cool); box-shadow: 0 0 9px #79aec288; }
+.frame figcaption .right { margin-left: auto; color: var(--faint); font-size: 11px; }
+
+/* ── 세 가지 축 ───────────────────────────── */
+.axes { border-bottom: 1px solid var(--line); }
+.axes ul { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.axes li { padding: clamp(28px, 3.4vw, 42px) clamp(20px, 2.4vw, 34px); border-left: 1px solid var(--line); }
+.axes li:first-child { border-left: 0; padding-left: 0; }
+.axes h3 { margin-top: 13px; font-size: 18.5px; }
+.axes p { margin-top: 9px; color: var(--muted); font-size: 14.5px; }
+.axes .k { color: var(--rec); font-family: var(--mono); font-size: 10.5px; letter-spacing: .2em; }
+
+/* ── 제목 블록 ────────────────────────────── */
+.section { padding-block: clamp(58px, 8vw, 96px); }
+.head { max-width: 38em; }
+.head h2 { margin-top: 13px; font-size: clamp(25px, 3vw, 36px); }
+.head p { margin-top: 14px; color: var(--muted); font-size: 15.5px; }
+
+/* ── 기능 격자 ────────────────────────────── */
+.cells { margin-top: clamp(32px, 4vw, 48px); display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border: 1px solid var(--line); }
+.cell { position: relative; padding: clamp(22px, 2.3vw, 30px); border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); background: transparent; transition: background .25s; }
+.cell:nth-child(3n) { border-right: 0; }
+.cell:nth-last-child(-n+3) { border-bottom: 0; }
+.cell::before { content: ""; position: absolute; left: -1px; top: 0; bottom: 0; width: 2px; background: var(--rec); scale: 1 0; transform-origin: 50% 0; transition: scale .3s ease; }
+.cell:hover { background: var(--panel); }
+.cell:hover::before { scale: 1 1; }
+.cell-top { display: flex; align-items: center; justify-content: space-between; color: var(--cool); transition: color .25s; }
+.cell:hover .cell-top { color: var(--rec); }
+.cell-top .no { font-family: var(--mono); font-size: 10.5px; letter-spacing: .16em; color: var(--faint); }
+.cell h3 { margin-top: 16px; font-size: 16.5px; }
+.cell p { margin-top: 9px; color: var(--muted); font-size: 14px; line-height: 1.72; }
+
+/* ── 두 화면 비교 ─────────────────────────── */
+.faces { background: #04070a; border-block: 1px solid var(--line); }
+.faces .pair { margin-top: clamp(32px, 4vw, 48px); display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: clamp(18px, 2.4vw, 30px); align-items: start; }
+.faces .desc { margin-top: 16px; color: var(--muted); font-size: 14px; }
+.faces .desc b { display: block; margin-bottom: 4px; color: var(--ink); font-size: 15px; font-weight: 650; }
+.faces .keys { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 6px; }
+.faces .keys span { padding: 4px 9px; border: 1px solid var(--line-hi); font-family: var(--mono); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--faint); }
+
+/* ── 설치: 앱의 이벤트 로그와 같은 줄 배열을 씁니다. ── */
+.setup { margin-top: clamp(30px, 3.6vw, 44px); border: 1px solid var(--line); border-left: 2px solid var(--rec); background: var(--panel); }
+.setup-row {
+  display: grid; grid-template-columns: 74px 168px minmax(0, 1fr);
+  gap: clamp(12px, 1.8vw, 26px); align-items: baseline;
+  padding: clamp(17px, 1.9vw, 23px) clamp(18px, 2.2vw, 28px);
+  border-top: 1px solid var(--line);
+}
+.setup-row:first-child { border-top: 0; }
+.setup-row .no { font-family: var(--mono); font-size: 11px; letter-spacing: .16em; color: var(--rec); }
+.setup-row h3 { font-size: 16px; }
+.setup-row p { color: var(--muted); font-size: 14px; }
+.setup code, .note code { font-family: var(--mono); font-size: 13px; color: var(--cool); }
+.note { margin-top: 18px; color: var(--faint); font-size: 13.5px; }
+.note a { color: var(--muted); border-bottom: 1px solid var(--line-hi); }
+.note a:hover { color: var(--ink); }
+
+/* ── 마무리와 바닥글 ──────────────────────── */
+.closing { border-top: 1px solid var(--line); }
+.closing .inner {
+  padding-block: clamp(50px, 6vw, 78px);
+  display: flex; flex-wrap: wrap; gap: 26px 40px; align-items: center; justify-content: space-between;
+}
+.closing h2 { font-size: clamp(23px, 2.7vw, 32px); }
+.closing p { margin-top: 12px; max-width: 36em; color: var(--muted); font-size: 15px; }
+.closing .cta { margin-top: 0; flex: none; }
+
+.statusbar {
+  display: flex; flex-wrap: wrap; gap: 6px 20px; padding: 11px 0;
+  border-top: 1px solid var(--line); font-family: var(--mono); font-size: 10.5px;
+  letter-spacing: .14em; text-transform: uppercase; color: var(--faint);
+}
+.statusbar .last { margin-left: auto; }
+
+footer { padding-block: 30px 46px; color: var(--faint); font-size: 13px; }
+footer .rows { display: flex; flex-wrap: wrap; gap: 16px 34px; justify-content: space-between; }
+footer .credits { max-width: 62ch; line-height: 1.95; }
+footer a { color: var(--muted); border-bottom: 1px solid transparent; transition: color .2s, border-color .2s; }
+footer a:hover { color: var(--ink); border-bottom-color: var(--line-hi); }
+footer .links { display: flex; gap: 18px; flex: none; }
+
+/* ── 나타나는 동작 ────────────────────────── */
+.reveal { opacity: 0; translate: 0 14px; transition: opacity .65s ease, translate .65s ease; }
+.reveal.on { opacity: 1; translate: 0 0; }
+
+/* ── 좁은 화면 ────────────────────────────── */
+@media (max-width: 1000px) {
+  body { padding-left: 0; padding-top: 58px; }
+  .rail { display: none; }
+  .topbar {
+    position: fixed; inset: 0 0 auto 0; z-index: 60; height: 58px;
+    display: flex; align-items: center; gap: 12px;
+    padding-inline: var(--pad);
+    background: color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter: blur(14px); border-bottom: 1px solid var(--line);
+  }
+  .topbar .name { display: flex; align-items: center; gap: 10px; font-weight: 700; letter-spacing: -.03em; font-size: 15px; }
+  .topbar img { width: 26px; height: 26px; border-radius: 7px; }
+  .topbar .spacer { margin-left: auto; }
+  .topbar .mini { padding: 7px 13px; border: 1px solid var(--line-hi); font-size: 12.5px; font-weight: 600; }
+  .hero-body { grid-template-columns: minmax(0, 1fr); align-items: stretch; }
+  .hero-shot { margin-right: 0; order: -1; }
+  .hero .lead { max-width: none; }
+  .axes ul { grid-template-columns: minmax(0, 1fr); }
+  .axes li { border-left: 0; border-top: 1px solid var(--line); padding-inline: 0; }
+  .axes li:first-child { border-top: 0; padding-top: 0; }
+  .cells { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cell:nth-child(3n) { border-right: 1px solid var(--line); }
+  .cell:nth-child(2n) { border-right: 0; }
+  .cell:nth-last-child(-n+3) { border-bottom: 1px solid var(--line); }
+  .cell:nth-last-child(-n+2) { border-bottom: 0; }
+  .setup-row { grid-template-columns: 66px minmax(0, 1fr); row-gap: 6px; }
+  .setup-row p { grid-column: 2; }
+}
+@media (max-width: 680px) {
+  .faces .pair { grid-template-columns: minmax(0, 1fr); }
+  .cells { grid-template-columns: minmax(0, 1fr); }
+  .cell, .cell:nth-child(3n), .cell:nth-child(2n) { border-right: 0; border-bottom: 1px solid var(--line); }
+  .cell:last-child { border-bottom: 0; }
+  .specs dt { width: 80px; }
+  .statusbar .last { margin-left: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+  .reveal { opacity: 1; translate: 0 0; }
+}
+</style>
+</head>
+<body>
+
+<a class="sr-only" href="#features">본문으로 건너뛰기</a>
+
+<!-- 아이콘 모음 -->
+<svg hidden aria-hidden="true">
+  <symbol id="i-rec" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.6" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="1.5"/><path d="M7 9h5M7 13h10M7 17h7"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3 4.5 6v6c0 4.4 3.1 7.6 7.5 9 4.4-1.4 7.5-4.6 7.5-9V6z"/><path d="M9 12.2l2.2 2.2L15.5 10"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 6.8V12l3.4 2"/></symbol>
+  <symbol id="i-music" viewBox="0 0 24 24"><path d="M9 17.5V5.2l10-1.7v12"/><circle cx="6.4" cy="17.8" r="2.6"/><circle cx="16.4" cy="15.8" r="2.6"/></symbol>
+  <symbol id="i-wave" viewBox="0 0 24 24"><path d="M3 11v2M7 8v8M11 4.5v15M15 9v6M19 10.5v3"/></symbol>
+  <symbol id="i-season" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="8.6" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="12" cy="7.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="15.4" cy="10" r="1.1" fill="currentColor" stroke="none"/><path d="M12 16.4c2 0 3-1 3-2.2 0-1-1-1.4-2-1.4"/></symbol>
+  <symbol id="i-monitor" viewBox="0 0 24 24"><rect x="2.5" y="4" width="19" height="13" rx="1.5"/><path d="M8.5 21h7M12 17v4"/></symbol>
+  <symbol id="i-tray" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="1.5"/><path d="M3 14.5h5l1.4 2h5.2l1.4-2H21"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 3.5v12M7.5 11.5 12 16l4.5-4.5M4.5 20h15"/></symbol>
+  <symbol id="i-github" viewBox="0 0 24 24"><path d="M9 19.2c-4.4 1.3-4.4-2.3-6.2-2.8m12.4 5.4v-3.5c0-1 .1-1.4-.5-2 2.7-.3 5.3-1.4 5.3-6a4.7 4.7 0 0 0-1.3-3.2 4.3 4.3 0 0 0-.1-3.3s-1.1-.3-3.5 1.3a12 12 0 0 0-6.2 0C6.5 3.5 5.4 3.8 5.4 3.8a4.3 4.3 0 0 0-.1 3.3A4.7 4.7 0 0 0 4 10.3c0 4.6 2.6 5.7 5.3 6-.4.4-.5.9-.5 1.5v4.1"/></symbol>
+</svg>
+
+<!-- 왼쪽 세로 레일 -->
+<aside class="rail">
+  <a class="rail-mark" href="#top" aria-label="맨 위로"><img src="assets/appicon.svg" alt="ShadowPlay Notifier 아이콘"></a>
+  <p class="rail-title">ShadowPlay Notifier</p>
+  <nav class="rail-nav" aria-label="구역 이동">
+    <a href="#features" data-dot><i></i><span>기능</span></a>
+    <a href="#screens" data-dot><i></i><span>화면</span></a>
+    <a href="#install" data-dot><i></i><span>설치</span></a>
+  </nav>
+  <a class="rail-gh" href="https://github.com/deuxdoom/Shadowplay-Notifier" aria-label="GitHub 저장소">
+    <svg class="icon"><use href="#i-github"/></svg>
+  </a>
+</aside>
+
+<!-- 좁은 화면용 상단 막대 -->
+<header class="topbar">
+  <a class="name" href="#top"><img src="assets/appicon.svg" alt="">ShadowPlay Notifier</a>
+  <span class="spacer"></span>
+  <a class="mini" data-exe href="https://github.com/deuxdoom/Shadowplay-Notifier/releases/latest/download/ShadowPlayNotifier.exe">내려받기 (EXE)</a>
+</header>
+
+<main id="top">
+
+<!-- ── 머리 화면 ── -->
+<section class="hero">
+  <div class="shell hero-inner">
+    <p class="status"><span class="dot"></span><span class="mono">Watching · Idle</span></p>
+    <h1>녹화는 <em>알아서 감지</em>하고,<br>나머지 시간엔 <b>월페이퍼</b>가 됩니다.</h1>
+    <div class="hero-body">
+      <div>
+        <p class="lead">
+          NVIDIA ShadowPlay 의 녹화 표시를 꺼 두어도 지금 녹화가 도는지 알 수 있습니다.
+          녹화 폴더만 지켜보다가 녹화가 시작되면 보조 모니터를 붉은 녹화 화면으로 바꾸고,
+          녹화가 없는 동안에는 시계와 날씨, 듣고 있는 음악을 띄웁니다.
+        </p>
+        <div class="cta">
+          <a class="btn btn-main" id="dl" data-exe href="https://github.com/deuxdoom/Shadowplay-Notifier/releases/latest/download/ShadowPlayNotifier.exe">
+            <svg class="icon" style="width:18px;height:18px"><use href="#i-down"/></svg>내려받기 (EXE)
+          </a>
+          <a class="btn btn-sub" href="https://github.com/deuxdoom/Shadowplay-Notifier">
+            <svg class="icon" style="width:18px;height:18px"><use href="#i-github"/></svg>GitHub 저장소
+          </a>
+        </div>
+        <p class="dlnote"><code>ShadowPlayNotifier.exe</code> <span id="dlsize">· 19.2 MB</span> · 설치 과정 없이 바로 실행합니다.</p>
+        <dl class="specs">
+          <div><dt>Platform</dt><dd>Windows 10 · 11</dd></div>
+          <div><dt>Install</dt><dd>실행 파일 하나를 받아 그대로 실행합니다. Python 을 설치하지 않습니다.</dd></div>
+          <div><dt>Capture</dt><dd>폴더를 읽기만 하므로 녹화 프로그램을 가리지 않습니다.</dd></div>
+          <div><dt>License</dt><dd>MIT · 무료로 씁니다.</dd></div>
+        </dl>
+      </div>
+      <figure class="hero-shot frame idle">
+        <img src="wallpaper.png" alt="시계와 날짜, 날씨, 오늘 달, 재생 중인 음악과 소리 파형을 보여 주는 월페이퍼 화면" width="960" height="640">
+        <figcaption><span class="led"></span><span class="mono">Idle — Wallpaper</span><span class="right">960 × 640</span></figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<!-- ── 세 가지 축 ── -->
+<section class="axes">
+  <div class="shell">
+    <ul>
+      <li>
+        <span class="k">01 — DETECT</span>
+        <h3>녹화를 놓치지 않습니다</h3>
+        <p>파일이 커지는지, 쓰기로 열려 있는지를 함께 살펴 녹화를 판정합니다. 시작하거나 멈추면 폴링 주기 한 번 안에 화면이 바뀝니다.</p>
+      </li>
+      <li>
+        <span class="k">02 — WALLPAPER</span>
+        <h3>기다리는 시간도 씁니다</h3>
+        <p>녹화가 없는 동안에는 시계와 날짜, 날씨, 오늘 달, 듣고 있는 음악과 소리 파형을 계절 사진 위에 보여 줍니다.</p>
+      </li>
+      <li>
+        <span class="k">03 — STAY OUT</span>
+        <h3>녹화에 끼어들지 않습니다</h3>
+        <p>폴더를 읽기만 하고 결과물에는 손대지 않습니다. 어떤 녹화 도구를 쓰든 동작하며, 창을 닫으면 트레이에서 감시만 이어 갑니다.</p>
+      </li>
+    </ul>
+  </div>
+</section>
+
+<!-- ── 기능 격자 ── -->
+<section class="section" id="features">
+  <div class="shell">
+    <div class="head reveal">
+      <span class="mono">Features</span>
+      <h2>한 화면에 담은 아홉 가지</h2>
+      <p>보조 모니터를 늘 켜 두는 자리에 맞추어, 멀리서도 읽히는 크기로 필요한 것만 띄웁니다.</p>
+    </div>
+    <div class="cells reveal">
+      <article class="cell">
+        <div class="cell-top"><svg class="icon"><use href="#i-rec"/></svg><span class="no">01</span></div>
+        <h3>녹화 상태 표시</h3>
+        <p>녹화가 시작되면 붉은 표시와 큰 경과 시간으로 바뀝니다. 표시등은 밝은 쪽으로 깜박이고 크기까지 함께 커져서 멀리서도 헷갈리지 않습니다.</p>
+      </article>
+      <article class="cell">
+        <div class="cell-top"><svg class="icon"><use href="#i-list"/></svg><span class="no">02</span></div>
+        <h3>녹화 정보 확인</h3>
+        <p>저장 폴더와 파일 이름, 경과 시간, 용량, 비트레이트, 마지막으로 파일이 커진 시각을 함께 보여 줍니다.</p>
+      </article>
+      <article class="cell">
+        <div class="cell-top"><svg class="icon"><use href="#i-shield"/></svg><span class="no">03</span></div>
+        <h3>읽기만 하는 감시</h3>
+        <p>녹화 프로그램에 끼어들지 않고 폴더를 읽기만 합니다. 녹화 결과물을 지우거나 옮기는 기능은 넣지 않았습니다.</p>
+      </article>
+      <article class="cell">
+        <div class="cell-top"><svg class="icon"><use href="#i-clock"/></svg><span class="no">04</span></div>
+        <h3>시계와 날씨</h3>
+        <p>큰 시계와 날짜, 요일에 더해 기온과 날씨 아이콘, 최고·최저 기온, 습도, 강수 확률을 띄웁니다. 날씨는 Open-Meteo 에서 받으며 API 키가 필요 없습니다.</p>
+      </article>
+      <article class="cell">
+        <div class="cell-top"><svg class="icon"><use href="#i-music"/></svg><span class="no">05</span></div>
+        <h3>재생 중인 음악</h3>
+        <p>Spotify 에서 듣고 있는 곡과 아티스트, 앨범 커버를 보여 줍니다. 로그인이나 계정 연결을 요구하지 않습니다.</p>
+      </article>
+      <article class="cell">
+        <div class="cell-top"><svg class="icon"><use href="#i-wave"/></svg><span class="no">06</span></div>
+        <h3>소리에 맞춰 움직이는 파형</h3>
+        <p>스피커로 나가는 소리를 12개 대역으로 나누어 64개의 무지개색 막대로 그립니다. 소리는 세기만 재고 녹음하거나 저장하지 않습니다.</p>
+      </article>
+      <article class="cell">
+        <div class="cell-top"><svg class="icon"><use href="#i-season"/></svg><span class="no">07</span></div>
+        <h3>사계절 사진과 시간대 색</h3>
+        <p>봄 벚꽃, 여름 바다, 가을 코코아, 겨울 서리가 달력을 따라 바뀌고 심야부터 저녁까지 화면 색이 함께 물듭니다. 사진은 실행 파일에 들어 있어 인터넷이 없어도 나옵니다.</p>
+      </article>
+      <article class="cell">
+        <div class="cell-top"><svg class="icon"><use href="#i-monitor"/></svg><span class="no">08</span></div>
+        <h3>보조 모니터와 전체화면</h3>
+        <p>창 크기와 같은 해상도의 모니터를 자동으로 찾아 그 자리에 띄웁니다. 전체화면으로 바꾸면 글자와 정보 영역이 해상도에 맞추어 함께 커집니다.</p>
+      </article>
+      <article class="cell">
+        <div class="cell-top"><svg class="icon"><use href="#i-tray"/></svg><span class="no">09</span></div>
+        <h3>트레이에서 계속 실행</h3>
+        <p>창을 닫으면 알림 영역으로 들어가 녹화 감시만 이어 갑니다. 감시 폴더와 표시할 모니터, 항상 위, 알림음은 환경설정 창에서 바로 바꿉니다.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ── 두 화면 ── -->
+<section class="section faces" id="screens">
+  <div class="shell">
+    <div class="head reveal">
+      <span class="mono">Screens</span>
+      <h2>같은 골격을 쓰는 두 화면</h2>
+      <p>시계가 있던 자리에 경과 시간이, 기온이 있던 자리에 용량이 들어갑니다. 녹화가 시작되어도 화면이 통째로 갈리지 않고, 사진의 조명만 낮추어 붉은 표시를 띄웁니다.</p>
+    </div>
+    <div class="pair reveal">
+      <div>
+        <figure class="frame idle">
+          <img src="wallpaper.png" alt="계절 사진 위에 시계와 날짜, 날씨, 오늘 달, 재생 중인 음악과 파형이 놓인 대기 화면" loading="lazy" width="960" height="640">
+          <figcaption><span class="led"></span><span class="mono">Idle</span><span class="right">녹화를 기다리는 동안</span></figcaption>
+        </figure>
+        <p class="desc"><b>월페이퍼 화면</b>큰 시계와 날짜, 날씨가 가운데를 차지하고 아래쪽에 지금 듣는 곡과 소리 파형이 놓입니다. 글자는 저마다 놓인 자리의 배경 밝기를 재어 흰색과 검정 가운데 잘 보이는 쪽으로 칠해집니다.</p>
+        <div class="keys"><span>Clock</span><span>Weather</span><span>Moon</span><span>Now Playing</span><span>Spectrum</span></div>
+      </div>
+      <div>
+        <figure class="frame">
+          <img src="main.png" alt="붉은 녹화 표시와 큰 경과 시간, 용량과 비트레이트, 이벤트 로그를 보여 주는 녹화 화면" loading="lazy" width="960" height="640">
+          <figcaption><span class="led"></span><span class="mono">Recording</span><span class="right">녹화가 감지된 동안</span></figcaption>
+        </figure>
+        <p class="desc"><b>녹화 화면</b>경과 시간이 화면을 채우고 오른쪽에 용량과 비트레이트, 마지막으로 파일이 커진 시각이 붙습니다. 아래 이벤트 로그에는 녹화가 시작되고 끝난 기록이 남습니다.</p>
+        <div class="keys"><span>Elapsed</span><span>Size</span><span>Bitrate</span><span>Event Log</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── 설치 ── -->
+<section class="section" id="install">
+  <div class="shell">
+    <div class="head reveal">
+      <span class="mono">Setup</span>
+      <h2>설치랄 것이 없습니다</h2>
+      <p>받은 실행 파일을 그대로 켜면 됩니다. 설정은 실행 파일 옆 <code>config.json</code> 에 저장되고, 바꾼 값은 앱을 껐다 켜지 않아도 곧바로 적용됩니다.</p>
+    </div>
+    <div class="setup reveal">
+      <div class="setup-row">
+        <span class="no">RUN 01</span>
+        <h3>실행 파일 받기</h3>
+        <p><code>ShadowPlayNotifier.exe</code> 를 내려받아 원하는 폴더에 둡니다. 압축을 풀 필요도, Python 을 깔 필요도 없습니다.</p>
+      </div>
+      <div class="setup-row">
+        <span class="no">RUN 02</span>
+        <h3>그대로 켜기</h3>
+        <p>두 번 눌러 실행하면 창 크기와 같은 해상도의 모니터를 찾아 그 자리에 뜹니다. 창은 아무 곳이나 끌어 옮기고 <code>F11</code> 로 전체화면에 들어갑니다.</p>
+      </div>
+      <div class="setup-row">
+        <span class="no">RUN 03</span>
+        <h3>녹화 폴더 알려 주기</h3>
+        <p>오른쪽 위 환경설정에서 NVIDIA App 의 동영상 저장 폴더를 고르고 저장하면 그때부터 하위 폴더까지 지켜봅니다.</p>
+      </div>
+    </div>
+    <p class="note">
+      쓰다가 막히면 <a href="https://github.com/deuxdoom/Shadowplay-Notifier#readme">README</a> 에 조작법과 설정 항목을 정리해 두었고,
+      녹화가 잡히지 않을 때는 실행 파일 옆 <code>monitor.log</code> 를 먼저 열어 보십시오.
+    </p>
+  </div>
+</section>
+
+<!-- ── 마무리 ── -->
+<section class="closing">
+  <div class="shell inner">
+    <div>
+      <h2>보조 모니터를 비워 두지 마십시오</h2>
+      <p>녹화할 때는 녹화 상태를, 그렇지 않을 때는 시계와 날씨와 음악을 띄웁니다. 무료이며 MIT 라이선스로 공개했습니다.</p>
+    </div>
+    <div class="cta">
+      <a class="btn btn-main" data-exe href="https://github.com/deuxdoom/Shadowplay-Notifier/releases/latest/download/ShadowPlayNotifier.exe">
+        <svg class="icon" style="width:18px;height:18px"><use href="#i-down"/></svg>내려받기 (EXE)
+      </a>
+      <a class="btn btn-sub" href="https://github.com/deuxdoom/Shadowplay-Notifier/releases">
+        <svg class="icon" style="width:18px;height:18px"><use href="#i-github"/></svg>지난 버전 보기
+      </a>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<div class="shell">
+  <div class="statusbar">
+    <span>ShadowPlay Notifier</span>
+    <span>Windows 10 · 11</span>
+    <span>MIT License</span>
+    <span class="last" id="ver">v2.2.0</span>
+  </div>
+  <footer>
+    <div class="rows">
+      <p class="credits">
+        © 2026 deuxdoom · 이 프로젝트는 MIT 라이선스를 따릅니다.<br>
+        아이콘은 Microsoft <a href="https://github.com/microsoft/fluentui-system-icons">Fluent UI System Icons</a>,
+        계절 사진은 <a href="https://unsplash.com/">Unsplash</a>,
+        글꼴은 <a href="https://github.com/orioncactus/pretendard">Pretendard</a> 와
+        <a href="https://github.com/JetBrains/JetBrainsMono">JetBrains Mono</a> 를 썼습니다.<br>
+        NVIDIA, ShadowPlay 는 NVIDIA Corporation 의 상표이며 이 프로젝트와 관련이 없습니다.
+      </p>
+      <p class="links">
+        <a href="https://github.com/deuxdoom/Shadowplay-Notifier">GitHub</a>
+        <a href="https://github.com/deuxdoom/Shadowplay-Notifier/releases">Releases</a>
+        <a href="https://github.com/deuxdoom/Shadowplay-Notifier/issues">Issues</a>
+      </p>
+    </div>
+  </footer>
+</div>
+
+<script>
+// 스크롤에 따라 나타나는 동작과 레일 표시등을 함께 다룹니다.
+(function () {
+  var reveals = document.querySelectorAll('.reveal');
+  if (!('IntersectionObserver' in window)) {
+    reveals.forEach(function (el) { el.classList.add('on'); });
+    return;
+  }
+
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (e.isIntersecting) { e.target.classList.add('on'); io.unobserve(e.target); }
+    });
+  }, { rootMargin: '0px 0px -12% 0px' });
+  reveals.forEach(function (el) { io.observe(el); });
+
+  var dots = Array.prototype.slice.call(document.querySelectorAll('.rail-nav a'));
+  var targets = dots.map(function (a) { return document.querySelector(a.getAttribute('href')); });
+  var spy = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      var i = targets.indexOf(e.target);
+      if (i > -1 && e.isIntersecting) {
+        dots.forEach(function (d) { d.classList.remove('on'); });
+        dots[i].classList.add('on');
+      }
+    });
+  }, { rootMargin: '-45% 0px -45% 0px' });
+  targets.forEach(function (t) { if (t) spy.observe(t); });
+})();
+
+// 최신 릴리스에서 버전과 실행 파일 크기를 받아 갱신합니다.
+// 조회에 실패해도 적어 둔 값과 latest 내려받기 주소가 그대로 남습니다.
+fetch('https://api.github.com/repos/deuxdoom/Shadowplay-Notifier/releases/latest')
+  .then(function (r) { return r.ok ? r.json() : null; })
+  .then(function (d) {
+    if (!d) return;
+
+    if (d.tag_name) {
+      var t = String(d.tag_name);
+      document.getElementById('ver').textContent = t.charAt(0) === 'v' ? t : 'v' + t;
+    }
+
+    var exe = (d.assets || []).filter(function (a) { return /\.exe$/i.test(a.name || ''); })[0];
+    if (!exe) return;
+
+    var size = document.getElementById('dlsize');
+    if (size && exe.size) size.textContent = '· ' + (exe.size / 1048576).toFixed(1) + ' MB';
+
+    if (exe.browser_download_url) {
+      Array.prototype.forEach.call(document.querySelectorAll('[data-exe]'), function (a) {
+        a.href = exe.browser_download_url;
+      });
+    }
+  })
+  .catch(function () {});
+</script>
+
+</body>
+</html>
