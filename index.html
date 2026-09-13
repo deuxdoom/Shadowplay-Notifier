@@ -298,6 +298,7 @@ footer .links { display: flex; gap: 18px; flex: none; }
   .reveal { opacity: 1; translate: 0 0; }
 }
 </style>
+<noscript><style>.reveal { opacity: 1; translate: 0 0; }</style></noscript>
 </head>
 <body>
 
@@ -427,7 +428,7 @@ footer .links { display: flex; gap: 18px; flex: none; }
       <article class="cell">
         <div class="cell-top"><svg class="icon"><use href="#i-clock"/></svg><span class="no">04</span></div>
         <h3>시계와 날씨</h3>
-        <p>큰 시계와 날짜, 요일에 더해 기온과 날씨 아이콘, 최고·최저 기온, 습도, 강수 확률을 띄웁니다. 날씨는 Open-Meteo 에서 받으며 API 키가 필요 없습니다.</p>
+        <p>Pretendard로 맞춘 큰 시계와 날짜, 요일에 더해 기온과 오늘 달, 날씨 정보를 띄웁니다. 콜론만 매초 깜빡이고 초 숫자는 계속 표시됩니다. 달은 작은 화면에서도 윤곽이 보입니다. 날씨는 Open-Meteo 에서 받으며 API 키가 필요 없습니다.</p>
       </article>
       <article class="cell">
         <div class="cell-top"><svg class="icon"><use href="#i-music"/></svg><span class="no">05</span></div>
@@ -442,7 +443,7 @@ footer .links { display: flex; gap: 18px; flex: none; }
       <article class="cell">
         <div class="cell-top"><svg class="icon"><use href="#i-season"/></svg><span class="no">07</span></div>
         <h3>사계절 사진과 시간대 색</h3>
-        <p>봄 벚꽃, 여름 바다, 가을 코코아, 겨울 서리가 달력을 따라 바뀌고 심야부터 저녁까지 화면 색이 함께 물듭니다. 사진은 실행 파일에 들어 있어 인터넷이 없어도 나옵니다.</p>
+        <p>계절이 바뀌면 배경 사진도 조용히 바뀌고, 심야부터 저녁까지 화면 색이 함께 물듭니다. 사진은 실행 파일에 들어 있어 인터넷이 없어도 나옵니다.</p>
       </article>
       <article class="cell">
         <div class="cell-top"><svg class="icon"><use href="#i-monitor"/></svg><span class="no">08</span></div>
@@ -452,7 +453,7 @@ footer .links { display: flex; gap: 18px; flex: none; }
       <article class="cell">
         <div class="cell-top"><svg class="icon"><use href="#i-tray"/></svg><span class="no">09</span></div>
         <h3>트레이에서 계속 실행</h3>
-        <p>창을 닫으면 알림 영역으로 들어가 녹화 감시만 이어 갑니다. 감시 폴더와 표시할 모니터, 항상 위, 알림음은 환경설정 창에서 바로 바꿉니다.</p>
+        <p>창을 닫으면 알림 영역으로 들어가 녹화 감시만 이어 갑니다. 트레이 메뉴에서 ‘윈도우 시작 시 실행’을 체크하면 로그인 후 자동으로 켜집니다. 감시 폴더와 모니터는 환경설정에서 바꿉니다.</p>
       </article>
     </div>
   </div>
@@ -544,7 +545,7 @@ footer .links { display: flex; gap: 18px; flex: none; }
     <span>ShadowPlay Notifier</span>
     <span>Windows 10 · 11</span>
     <span>MIT License</span>
-    <span class="last" id="ver">v2.2.0</span>
+    <span class="last" id="ver">v2.3.0</span>
   </div>
   <footer>
     <div class="rows">
@@ -607,7 +608,7 @@ fetch('https://api.github.com/repos/deuxdoom/Shadowplay-Notifier/releases/latest
       document.getElementById('ver').textContent = t.charAt(0) === 'v' ? t : 'v' + t;
     }
 
-    var exe = (d.assets || []).filter(function (a) { return /\.exe$/i.test(a.name || ''); })[0];
+    var exe = (d.assets || []).filter(function (a) { return a.name === 'ShadowPlayNotifier.exe'; })[0];
     if (!exe) return;
 
     var size = document.getElementById('dlsize');
