@@ -95,12 +95,14 @@
 ## 📦 설치 및 실행
 
 1. [Releases](https://github.com/deuxdoom/Shadowplay-Notifier/releases/latest)에서
-   ZIP 파일을 내려받아 압축을 풉니다.
-2. `ShadowPlayNotifier.exe`를 실행합니다.
+   `ShadowPlayNotifier.exe` 를 내려받아 원하는 폴더에 둡니다.
+2. 내려받은 파일을 그대로 실행합니다. 압축을 풀 필요도, 설치 과정도 없습니다.
 3. 오른쪽 위 **⚙️ 환경설정**에서 NVIDIA App 의 동영상 저장 폴더를 지정하고
    저장합니다.
 
 **Windows 10 이상**에서 사용하며, Python 을 따로 설치할 필요가 없습니다.
+설정과 기록은 실행 파일 옆에 `config.json` 과 `monitor.log` 로 남으므로,
+쓰기가 되는 폴더에 두십시오.
 
 ---
 
