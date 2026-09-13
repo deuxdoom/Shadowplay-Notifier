@@ -43,6 +43,9 @@ REC_NUMERIC_FAMILIES = ("Segoe UI Light", "Segoe UI", "Pretendard JP", "Arial")
 # Pretendard 숫자가 글자 상자 왼쪽에 두는 여백입니다. 글꼴 크기에 대한 비율이며,
 # 시계를 날짜와 왼쪽 정렬할 때 이만큼 빼 줍니다.
 BEARING = 0.061
+# 시계 옆 초, 그리고 기온 옆 날씨 아이콘이 두는 사이 간격입니다. 글획 사이의
+# 실제 거리를 뜻하므로 글꼴이 두는 여백(BEARING)을 뺀 자리에 놓습니다.
+SEC_GAP, WICON_GAP = 22, 20
 DOW = ("월요일", "화요일", "수요일", "목요일", "금요일", "토요일", "일요일")
 
 
@@ -253,10 +256,13 @@ class WallpaperView:
         # 시계가 가져갑니다.
         c.coords(self.phase_item, x, 52 * sy)
         c.coords(self.date_item, x, 96 * sy)
-        self._weather_center = (right - 268 * s, 206 * sy)
+        # 시계가 쓸 수 있는 폭은 가장 넓은 기온을 기준으로 고정해 둡니다.
+        # 아이콘이 짧은 기온을 따라 오른쪽으로 당겨져도 시계 크기는 그대로입니다.
+        self._weather_limit_x = right - 268 * s
+        self._weather_center = (self._weather_limit_x, 206 * sy)
         self._place_clock()
-        c.coords(self.wicon_item, *self._weather_center)
         c.coords(self.temp_item, right, 206 * sy)
+        self._place_weather_icon()
         c.coords(self.desc_item, right, 288 * sy)
         c.coords(self.meta_item, right, 326 * sy)
         c.coords(self.meta2_item, right, 358 * sy)
@@ -291,10 +297,10 @@ class WallpaperView:
         # 이 여백은 글꼴 크기에 비례하므로 고정값으로 두면 시계 크기를 바꿀 때
         # 날짜와의 왼쪽 정렬이 어긋납니다.
         left = 60 * self.scale_x - size * BEARING
-        limit = self._weather_center[0] - WICON_SIZE * s / 2 - left - 12 * s
+        limit = self._weather_limit_x - WICON_SIZE * s / 2 - left - 12 * s
         # 초가 시계 오른쪽에 서므로 그 폭과 사이 간격까지 넣고 줄여야 날씨
-        # 아이콘과 부딪히지 않습니다. 폭은 가장 넓은 두 자리를 기준으로 잡습니다.
-        sec_gap = 16 * s
+        # 아이콘과 부딪히지 않습니다. 시각은 자릿수마다 폭이 다르므로 여기서는
+        # 가장 넓은 두 자리를 기준으로 잡아 어떤 시각에도 넘치지 않게 합니다.
         sec_width = max(sec_font.measure("%02d" % n) for n in range(60))
         while True:
             font.configure(size=-size)
@@ -302,19 +308,24 @@ class WallpaperView:
             minute_width = max(font.measure("%02d" % n) for n in range(60))
             colon_width = round(font.measure(":") * .8)
             width = hour_width + colon_width + minute_width
+            # 큰 숫자가 글자 상자 오른쪽에 두는 여백만큼 당겨야 눈에 보이는
+            # 사이 간격이 SEC_GAP 과 같아집니다.
+            sec_gap = SEC_GAP * s - size * BEARING
             if width + sec_gap + sec_width <= limit or size <= 8:
                 break
             size -= 1
         self._clock_left, self._clock_colon_width = left, colon_width
-        self._position_clock()
+        # 초는 위에서 잰 최대 폭이 아니라 실제로 그려진 분의 끝에 붙습니다.
+        # 최대 폭에 맞추면 좁은 분(19 등)에서 초만 멀리 떨어져 보입니다.
+        self._sec_gap = sec_gap
         # 초의 베이스라인을 시계의 베이스라인과 맞춥니다. 두 글자가 같은 줄에
         # 앉아 보이게 하려면 글자 상자 가운데가 아니라 베이스라인을 맞춰야 합니다.
         baseline = (248 * sy - font.metrics("linespace") / 2
                     + font.metrics("ascent"))
-        c.coords(self.sec_item, left + width + sec_gap,
-                 baseline + sec_font.metrics("linespace") / 2
-                 - sec_font.metrics("ascent"))
+        self._sec_y = (baseline + sec_font.metrics("linespace") / 2
+                       - sec_font.metrics("ascent"))
         c.itemconfigure(self.sec_item, anchor="w")
+        self._position_clock()
 
     def _position_clock(self):
         c, s, sy = self.canvas, self.scale, self.scale_y
@@ -329,6 +340,29 @@ class WallpaperView:
         for (item, shadow), (x, y) in zip(self._clock_parts, positions):
             c.coords(item, x, y)
             c.coords(shadow, x + s, y + 2 * s)
+        minute_end = (hour_end + colon_width
+                      + font.measure(c.itemcget(self.minute_item, "text") or "00"))
+        c.coords(self.sec_item, minute_end + self._sec_gap, self._sec_y)
+
+    def _place_weather_icon(self):
+        """기온 글자 폭을 재서 날씨 아이콘을 그 왼쪽에 붙입니다.
+
+        기온은 자릿수와 부호에 따라 폭이 크게 달라지므로 아이콘을 고정 좌표에
+        두면 짧은 기온에서 사이가 벌어집니다. 달이 보조 정보 두 줄을 실제로
+        재서 따라붙는 것과 같은 방식입니다. 왼쪽으로는 ``_weather_limit_x``
+        보다 더 가지 않으므로 시계와 부딪히지 않습니다.
+        """
+        s = self.scale
+        right = self.width - 60 * self.scale_x
+        font = self._fonts["temp"][0]
+        text = self.canvas.itemcget(self.temp_item, "text") or "—°"
+        # 기온 숫자가 글자 상자 왼쪽에 두는 여백만큼 더 당겨야 글획 사이가
+        # 눈으로 보는 간격과 같아집니다.
+        gap = WICON_GAP * s - abs(font.cget("size")) * BEARING
+        x = right - font.measure(text) - gap - WICON_SIZE * s / 2
+        self._weather_center = (max(self._weather_limit_x, x),
+                                self._weather_center[1])
+        self.canvas.coords(self.wicon_item, *self._weather_center)
 
     def _place_recording(self):
         """녹화 화면의 자리입니다. 월페이퍼와 같은 여백을 씁니다."""
@@ -826,6 +860,7 @@ class WallpaperView:
         current = provider.current if provider else None
         if current is None or not current.ok or current.temp is None:
             self.canvas.itemconfigure(self.temp_item, text="—°")
+            self._place_weather_icon()
             self.canvas.itemconfigure(self.desc_item, text="날씨 연결 중" if version == 0 else "날씨 정보 없음")
             self.canvas.itemconfigure(self.meta_item, text="")
             self.canvas.itemconfigure(self.meta2_item, text="")
@@ -839,14 +874,19 @@ class WallpaperView:
                 self._sky_key = "clear"
                 self._bake_sky()
             return
-        self.canvas.itemconfigure(self.temp_item, text="%d°" % round(current.temp))
         # 영하 세 자리 등 폭이 긴 기온도 큰 아이콘과 겹치지 않게 맞춥니다.
+        # 글꼴 크기를 먼저 정한 뒤에 글자를 넣습니다. 순서를 뒤집으면 Tk 가
+        # 들고 있던 예전 크기의 bbox 가 한 프레임 남아, 그 값으로 자리를
+        # 잡는 아이콘이 기온과 겹쳐 보입니다.
+        text = "%d°" % round(current.temp)
         temp_font = self._fonts["temp"][0]
         size = round(94 * self.scale)
         temp_font.configure(size=-max(8, size))
-        while size > 50 * self.scale and temp_font.measure("%d°" % round(current.temp)) > 162 * self.scale:
+        while size > 50 * self.scale and temp_font.measure(text) > 162 * self.scale:
             size -= 1
             temp_font.configure(size=-max(8, size))
+        self.canvas.itemconfigure(self.temp_item, text=text)
+        self._place_weather_icon()
         self.canvas.itemconfigure(self.desc_item, text=current.text)
         high = []
         if current.tmax is not None:
