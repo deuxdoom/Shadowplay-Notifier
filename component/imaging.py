@@ -9,11 +9,13 @@ tkinter 의 ``PhotoImage`` 는 JPEG 를 읽지 못합니다. 그래서 앨범 �
 
 import colorsys
 import ctypes
+import math
+import os
 import struct
 import zlib
 from ctypes import byref, c_void_p
 
-from .paths import log
+from .paths import RESOURCE_DIR, detail, log
 
 gdiplus = ctypes.windll.gdiplus
 
@@ -173,7 +175,7 @@ def cover_ppm(data, size):
         dst = _draw_scaled(src, size, size)
         return _to_ppm(dst, size, size)
     except Exception as exc:
-        log("[그림] 커버를 만들지 못했습니다: %s" % exc)
+        detail("[그림] 커버를 만들지 못했습니다: %s" % exc)
         return None
     finally:
         if dst:
@@ -247,7 +249,7 @@ def dominant_color(data, fallback=(120, 120, 132)):
                     best_score, best = score, (r, g, b)
         return best
     except Exception as exc:
-        log("[그림] 대표색을 찾지 못했습니다: %s" % exc)
+        detail("[그림] 대표색을 찾지 못했습니다: %s" % exc)
         return fallback
     finally:
         if small:
@@ -297,3 +299,117 @@ def upscale_rgb(pixels, small_w, small_h, width, height):
             gdiplus.GdipDisposeImage(dst)
         if src:
             gdiplus.GdipDisposeImage(src)
+
+
+# 실제 달 사진입니다. 배경을 지우고 정사각형에 꽉 차게 맞춰 두었습니다.
+MOON_IMAGE = "moon.png"
+# 빛이 닿지 않는 면에 덮는 검정의 짙기입니다. 0.9 면 표면이 어렴풋이 남습니다.
+MOON_SHADOW = 0.90
+_moon_surface = {}
+
+
+def _moon_source(size):
+    """달 사진을 원하는 크기로 줄여 RGBA 로 들고 있습니다.
+
+    사진은 바뀌지 않으므로 크기마다 한 번만 만들어 둡니다. 화면 크기가
+    달라지면 이전 것은 버립니다.
+    """
+    if size in _moon_surface:
+        return _moon_surface[size]
+    path = os.path.join(RESOURCE_DIR, "assets", MOON_IMAGE)
+    try:
+        with open(path, "rb") as fp:
+            data = fp.read()
+    except OSError as exc:
+        log("[그림] 달 사진을 읽지 못했습니다: %s" % exc)
+        return None
+    if not start():
+        return None
+    src = dst = None
+    try:
+        src = _bitmap_from_bytes(data)
+        dst = _draw_scaled(src, size, size)
+        rgba = _to_rgba(dst, size, size)
+    except Exception as exc:
+        log("[그림] 달 사진을 줄이지 못했습니다: %s" % exc)
+        return None
+    finally:
+        if dst:
+            gdiplus.GdipDisposeImage(dst)
+        if src:
+            gdiplus.GdipDisposeImage(src)
+    _moon_surface.clear()
+    _moon_surface[size] = rgba
+    return rgba
+
+
+def _to_rgba(bitmap, width, height):
+    """알파를 살린 채로 픽셀을 꺼냅니다."""
+    data = _BitmapData()
+    rect = _Rect(0, 0, width, height)
+    status = gdiplus.GdipBitmapLockBits(bitmap, byref(rect), 1,
+                                        PIXEL_FORMAT_32BPP_ARGB, byref(data))
+    if status:
+        raise OSError("그림 픽셀을 읽지 못했습니다 (%d)" % status)
+    raw = ctypes.string_at(data.Scan0, data.Stride * height)
+    stride = data.Stride
+    gdiplus.GdipBitmapUnlockBits(bitmap, byref(data))
+    span = width * 4
+    out = bytearray(span * height)
+    for y in range(height):
+        line = raw[y * stride: y * stride + span]
+        base = y * span
+        out[base:base + span:4] = line[2::4]      # R
+        out[base + 1:base + span:4] = line[1::4]  # G
+        out[base + 2:base + span:4] = line[0::4]  # B
+        out[base + 3:base + span:4] = line[3::4]  # A
+    return bytes(out)
+
+
+def moon_png(size, phase):
+    """오늘 달을 한 장 굽습니다. 알파가 있는 PNG 바이트를 돌려줍니다.
+
+    실제 달 사진을 바탕에 깔고, 그 위에 빛이 닿지 않는 면을 계산해 검정을
+    덮습니다. 완전히 지우지 않고 90% 만 덮기 때문에 달의 윤곽과 표면 무늬가
+    어렴풋이 남아, 어디까지 차올랐는지 함께 보입니다.
+
+    ``phase`` 는 0 이 삭, 0.5 가 보름입니다. 하루에 한 번꼴로만 바뀌므로
+    이 함수도 그만큼만 부르면 됩니다.
+    """
+    n = max(8, int(size))
+    source = _moon_source(n)
+    if source is None:
+        return None
+    # 태양은 위상각만큼 돌아간 자리에 있습니다. 삭이면 달 뒤쪽입니다.
+    angle = 2.0 * math.pi * (phase % 1.0)
+    sun_x, sun_z = math.sin(angle), -math.cos(angle)
+
+    rgba = bytearray(source)
+    half = n / 2.0
+    for y in range(n):
+        ny = (y + 0.5 - half) / half
+        row = y * n * 4
+        for x in range(n):
+            i = row + x * 4
+            if not rgba[i + 3]:
+                continue
+            nx = (x + 0.5 - half) / half
+            d2 = nx * nx + ny * ny
+            nz = math.sqrt(1.0 - d2) if d2 < 1.0 else 0.0
+            light = nx * sun_x + nz * sun_z
+            lit = (light ** 0.6) if light > 0.0 else 0.0
+            shade = (1.0 - MOON_SHADOW) + MOON_SHADOW * lit
+            rgba[i] = round(rgba[i] * shade)
+            rgba[i + 1] = round(rgba[i + 1] * shade)
+            rgba[i + 2] = round(rgba[i + 2] * shade)
+
+    def chunk(name, body):
+        return (struct.pack(">I", len(body)) + name + body +
+                struct.pack(">I", zlib.crc32(name + body) & 0xffffffff))
+
+    span = n * 4
+    scanlines = b"".join(bytes([0]) + rgba[y * span:(y + 1) * span]
+                         for y in range(n))
+    return (bytes([137, 80, 78, 71, 13, 10, 26, 10]) +
+            chunk(b"IHDR", struct.pack(">IIBBBBB", n, n, 8, 6, 0, 0, 0)) +
+            chunk(b"IDAT", zlib.compress(scanlines, 6)) + chunk(b"IEND", b""))

@@ -15,7 +15,7 @@ from component import fonts, instance, version
 from component.app import MonitorApp
 from component.config import build_settings, load_config, parse_args
 from component.display import enable_dpi_awareness, window_position
-from component.paths import install_excepthook, log
+from component.paths import detail, install_excepthook, log, set_verbose
 from component.theme import C_BG, C_MUTED, WIN_H, WIN_W
 from component.watcher import WatchSupervisor
 from component.tray import TrayIcon
@@ -28,8 +28,8 @@ def place_window(root, settings):
         spot = (max(0, (root.winfo_screenwidth() - WIN_W) // 2),
                 max(0, (root.winfo_screenheight() - WIN_H) // 2))
     root.geometry("%dx%d+%d+%d" % (WIN_W, WIN_H, spot[0], spot[1]))
-    log("창 배치: %dx%d+%d+%d (monitor=%d)"
-        % (WIN_W, WIN_H, spot[0], spot[1], settings["monitor"]))
+    detail("창 배치: %dx%d+%d+%d (monitor=%d)"
+           % (WIN_W, WIN_H, spot[0], spot[1], settings["monitor"]))
 
 
 def main(argv=None):
@@ -44,6 +44,8 @@ def main(argv=None):
         return 1
 
     settings = build_settings(load_config(), parse_args(argv))
+    # 평소에는 녹화와 오류만 남깁니다. 문제를 찾을 때만 자세한 기록을 켭니다.
+    set_verbose(settings.get("verbose_log", False))
 
     enable_dpi_awareness()
     # 묶어 온 글꼴을 이 프로그램에서만 쓰도록 등록합니다. 창을 만들기 전에
@@ -126,10 +128,9 @@ def main(argv=None):
         root.after(300, grab_focus)
 
     supervisor.start(settings)
-    app.add_log("[시작] 감시를 시작했습니다.", C_MUTED)
-    log("앱 시작 %s: dirs=%s interval=%.1f stall=%.1f"
-        % (version.VERSION, settings["dirs"], settings["interval"],
-           settings["stall"]))
+    app.add_log("[시작] 감시를 시작했습니다.", C_MUTED, "", "감시를 시작했습니다")
+    log("앱 시작 %s  감시: %s" % (version.VERSION,
+                                  " · ".join(settings["dirs"]) or "(없음)"))
     try:
         root.mainloop()
     finally:

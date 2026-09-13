@@ -17,7 +17,7 @@ import urllib.parse
 import urllib.request
 from dataclasses import dataclass
 
-from .paths import log
+from .paths import detail, log
 
 API_URL = "https://api.open-meteo.com/v1/forecast"
 TIMEOUT = 8.0
@@ -115,7 +115,7 @@ def fetch(latitude, longitude, context=None):
                                     context=context) as resp:
             body = json.loads(resp.read().decode("utf-8"))
     except (urllib.error.URLError, ValueError, OSError, TimeoutError) as exc:
-        log("[날씨] 받아 오지 못했습니다: %s" % exc)
+        detail("[날씨] 받아 오지 못했습니다: %s" % exc)
         return Weather()
     try:
         cur = body["current"]
@@ -142,10 +142,13 @@ def fetch(latitude, longitude, context=None):
 class WeatherWatch(threading.Thread):
     """날씨를 주기적으로 받아 두는 스레드입니다.
 
+    한 시간에 한 번이면 충분합니다. 기온과 하늘 상태가 그보다 자주 바뀌지
+    않고, 상시 표시 화면이라 조회를 자주 할 이유도 없습니다.
+
     화면 쪽에서는 :attr:`current` 와 :attr:`version` 만 읽으면 됩니다.
     """
 
-    def __init__(self, latitude, longitude, interval=600.0):
+    def __init__(self, latitude, longitude, interval=3600.0):
         super().__init__(name="weather", daemon=True)
         self.latitude = latitude
         self.longitude = longitude
@@ -163,7 +166,7 @@ class WeatherWatch(threading.Thread):
                 fails = 0
                 self.current = got
                 self.version += 1
-                log("[날씨] %s %.1f℃ 습도 %s%% 강수 %s%%"
+                detail("[날씨] %s %.1f℃ 습도 %s%% 강수 %s%%"
                     % (got.text, got.temp, got.humidity, got.precip))
                 wait = self.interval
             else:
@@ -174,3 +177,38 @@ class WeatherWatch(threading.Thread):
 
     def stop(self):
         self.stop_event.set()
+
+
+# 달이 한 번 차고 기우는 데 걸리는 시간(삭망월)입니다.
+SYNODIC_MONTH = 29.530588853 * 86400.0
+# 2000년 1월 6일 18시 14분(UTC)이 삭이었습니다. 여기서부터 셉니다.
+KNOWN_NEW_MOON = 947182440.0
+
+
+def moon_phase(when=None):
+    """달의 위상을 0~1 로 돌려줍니다.
+
+    0 은 삭, 0.25 는 상현, 0.5 는 보름, 0.75 는 하현입니다. 날짜만으로 셈하는
+    간단한 계산이라 하루 안쪽의 오차가 있지만, 모양을 알아보는 데는 넉넉합니다.
+    """
+    now = time.time() if when is None else when
+    return ((now - KNOWN_NEW_MOON) % SYNODIC_MONTH) / SYNODIC_MONTH
+
+
+def moon_name(phase):
+    """위상에 붙는 이름입니다."""
+    if phase < 0.03 or phase >= 0.97:
+        return "삭"
+    if phase < 0.22:
+        return "초승달"
+    if phase < 0.28:
+        return "상현달"
+    if phase < 0.47:
+        return "차오르는 달"
+    if phase < 0.53:
+        return "보름달"
+    if phase < 0.72:
+        return "기우는 달"
+    if phase < 0.78:
+        return "하현달"
+    return "그믐달"

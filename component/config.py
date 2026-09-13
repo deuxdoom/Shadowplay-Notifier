@@ -38,7 +38,7 @@ DEFAULT_CONFIG = {
 WALLPAPER_FPS_DEFAULT = 30
 
 # 기본 파일에는 넣지 않지만, 직접 적어 두면 읽어 쓰는 값들입니다.
-ADVANCED_KEYS = ("patterns", "recursive", "wallpaper_fps")
+ADVANCED_KEYS = ("patterns", "recursive", "wallpaper_fps", "verbose_log")
 
 
 def load_config():
@@ -170,6 +170,8 @@ def build_settings(cfg, args):
         "wallpaper": bool(pick(args.wallpaper, "wallpaper", True)),
         "latitude": float(cfg.get("latitude", 37.5665) or 37.5665),
         "longitude": float(cfg.get("longitude", 126.9780) or 126.9780),
+        # monitor.log 에 자세한 기록까지 남길지 정합니다. 문제를 찾을 때만 켭니다.
+        "verbose_log": bool(cfg.get("verbose_log", False)),
         "wallpaper_fps": max(12, min(40, int(
             cfg.get("wallpaper_fps", WALLPAPER_FPS_DEFAULT)
             or WALLPAPER_FPS_DEFAULT))),

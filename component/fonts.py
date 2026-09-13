@@ -15,7 +15,7 @@ Pretendard JP 는 한글과 일본어를 한 벌로 담고 있어서, 일본 노
 import ctypes
 import os
 
-from .paths import RESOURCE_DIR, log
+from .paths import RESOURCE_DIR, detail, log
 
 FONT_DIR = os.path.join(RESOURCE_DIR, "assets", "fonts")
 
@@ -40,7 +40,7 @@ def load():
         return list(_loaded)
     _done = True
     if not os.path.isdir(FONT_DIR):
-        log("[글꼴] 글꼴 폴더가 없어 윈도우 글꼴을 씁니다: %s" % FONT_DIR)
+        detail("[글꼴] 글꼴 폴더가 없어 윈도우 글꼴을 씁니다: %s" % FONT_DIR)
         return []
     gdi32 = ctypes.windll.gdi32
     gdi32.AddFontResourceExW.argtypes = [ctypes.c_wchar_p, ctypes.c_uint,
@@ -50,7 +50,7 @@ def load():
     for filename, family in BUNDLED:
         path = os.path.join(FONT_DIR, filename)
         if not os.path.isfile(path):
-            log("[글꼴] 파일이 없습니다: %s" % filename)
+            detail("[글꼴] 파일이 없습니다: %s" % filename)
             continue
         added = gdi32.AddFontResourceExW(path, FR_PRIVATE, None)
         if added:
@@ -60,7 +60,7 @@ def load():
         else:
             log("[글꼴] 등록하지 못했습니다: %s" % filename)
     if names:
-        log("[글꼴] %s 를 이 프로그램에서만 쓰도록 등록했습니다." % ", ".join(names))
+        detail("[글꼴] %s 를 이 프로그램에서만 쓰도록 등록했습니다." % ", ".join(names))
     return names
 
 

@@ -37,6 +37,25 @@ LOG_PATH = os.path.join(BASE_DIR, "monitor.log")
 _log_lock = threading.Lock()
 
 
+_verbose = False
+
+
+def set_verbose(on):
+    """자세한 기록을 남길지 정합니다. config.json 의 verbose_log 로 켭니다."""
+    global _verbose
+    _verbose = bool(on)
+
+
+def detail(message):
+    """평소에는 남기지 않는 기록입니다.
+
+    글꼴 등록이나 곡이 바뀐 일처럼 늘 일어나는 것은 여기로 보냅니다.
+    monitor.log 에는 녹화와 오류만 남아야 무엇이 잘못되었는지 눈에 띕니다.
+    """
+    if _verbose:
+        log(message)
+
+
 def log(message):
     """--noconsole 로 빌드하므로 화면 출력 대신 파일에 남깁니다."""
     line = "%s  %s" % (time.strftime("%Y-%m-%d %H:%M:%S"), message)

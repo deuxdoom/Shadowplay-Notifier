@@ -22,7 +22,7 @@ from ctypes import byref, wintypes
 from dataclasses import dataclass, field
 
 from . import imaging
-from .paths import log
+from .paths import detail, log
 
 PLAYER_EXE = "spotify.exe"
 PLAYER_CLASS = "Chrome_WidgetWin_1"
@@ -160,7 +160,7 @@ def lookup_cover(artist, title, context):
             if results:
                 break
     except (urllib.error.URLError, ValueError, OSError, TimeoutError) as exc:
-        log("[음악] 커버를 찾지 못했습니다: %s" % exc)
+        detail("[음악] 커버를 찾지 못했습니다: %s" % exc)
         return None, None
     if not results:
         return None, None
@@ -172,7 +172,7 @@ def lookup_cover(artist, title, context):
     try:
         raw = _get(art.replace("100x100bb", COVER_SIZE), context)
     except (urllib.error.URLError, OSError, TimeoutError) as exc:
-        log("[음악] 커버를 받지 못했습니다: %s" % exc)
+        detail("[음악] 커버를 받지 못했습니다: %s" % exc)
         return album, None
     return album, raw
 
@@ -224,7 +224,7 @@ class NowPlaying(threading.Thread):
         self.track = Track(artist=artist, title=title, album=album or "",
                            cover=raw, accent=accent)
         self.version += 1
-        log("[음악] %s - %s%s" % (artist, title, " (커버 있음)" if raw else ""))
+        detail("[음악] %s - %s%s" % (artist, title, " (커버 있음)" if raw else ""))
 
     def stop(self):
         self.stop_event.set()

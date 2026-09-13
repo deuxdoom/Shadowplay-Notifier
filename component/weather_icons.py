@@ -76,3 +76,34 @@ def svg(name, color="#ffffff", night=False):
     return (
         '<svg xmlns="http://www.w3.org/2000/svg" viewBox="%s">%s</svg>'
         % (box, body))
+
+
+# 아이콘마다 어울리는 색입니다. 원본이 단색 도형 하나이므로 한 가지 색으로
+# 칠하되, 무엇을 그린 것인지 한눈에 알아보도록 종류마다 달리 잡았습니다.
+COLORS = {
+    "sunny": "#ffd35e",          # 해
+    "partly_cloudy": "#ecd9ad",  # 해와 구름이 겹친 그림이라 따뜻한 쪽으로
+    "cloudy": "#d3dceb",         # 구름
+    "fog": "#c3cdda",            # 안개
+    "drizzle": "#9ec8ef",        # 이슬비
+    "rain": "#7fb8ee",           # 비
+    "showers": "#8cc0ef",        # 소나기
+    "rain_snow": "#bcd8f2",      # 진눈깨비
+    "snow": "#eaf3ff",           # 눈
+    "snowflake": "#eaf3ff",
+    "snow_showers": "#e2eeff",
+    "thunder": "#ffc163",        # 뇌우
+}
+
+# 밤에는 달빛에 가깝게 식힙니다.
+NIGHT_COLORS = {
+    "sunny": "#dbe4ff",          # 밤의 맑음은 달로 바뀝니다
+    "partly_cloudy": "#c9d5ee",
+}
+
+
+def color(name, night=False):
+    """아이콘에 쓸 색입니다."""
+    if night and name in NIGHT_COLORS:
+        return NIGHT_COLORS[name]
+    return COLORS.get(name, "#d3dceb")

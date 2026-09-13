@@ -3,7 +3,7 @@
 import ctypes
 import sys
 
-from .paths import log
+from .paths import detail, log
 from .theme import WIN_H, WIN_W
 
 
@@ -48,7 +48,7 @@ def monitor_rects():
 
         ctypes.windll.user32.EnumDisplayMonitors(0, 0, proc(collect), 0)
     except Exception as exc:
-        log("[표시] 모니터 목록을 읽지 못했습니다: %s" % exc)
+        detail("[표시] 모니터 목록을 읽지 못했습니다: %s" % exc)
         return []
     rects.sort(key=lambda item: (item[0], item[1]))
     return rects
@@ -83,17 +83,17 @@ def window_position(index):
         chosen = rects[index]
         if chosen[2] >= WIN_W and chosen[3] >= WIN_H:
             return center_in(chosen)
-        log("[표시] %d번 모니터(%dx%d)가 창보다 작아 자동 선택으로 넘어갑니다."
+        detail("[표시] %d번 모니터(%dx%d)가 창보다 작아 자동 선택으로 넘어갑니다."
             % (index, chosen[2], chosen[3]))
     elif index >= 0:
-        log("[표시] %d번 모니터가 없어 자동 선택으로 넘어갑니다. (연결된 모니터 %d개)"
+        detail("[표시] %d번 모니터가 없어 자동 선택으로 넘어갑니다. (연결된 모니터 %d개)"
             % (index, len(rects)))
 
     for rect in rects:
         if rect[2] == WIN_W and rect[3] == WIN_H:
-            log("[표시] 창 크기와 같은 모니터를 찾았습니다: %s" % (rect,))
+            detail("[표시] 창 크기와 같은 모니터를 찾았습니다: %s" % (rect,))
             return center_in(rect)
 
     primary = monitor_for_point(0, 0) or rects[0]
-    log("[표시] 주 모니터 한가운데에 표시합니다: %s" % (primary,))
+    detail("[표시] 주 모니터 한가운데에 표시합니다: %s" % (primary,))
     return center_in(primary)

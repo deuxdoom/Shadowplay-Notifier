@@ -18,7 +18,7 @@ import threading
 import time
 from ctypes import POINTER, byref, c_uint, c_uint32, c_uint64, c_void_p
 
-from .paths import log
+from .paths import detail, log
 
 BARS = 12
 N_FFT = 1024
@@ -196,7 +196,7 @@ class AudioLevels(threading.Thread):
         block = fmt.nBlockAlign
         _, edges, centers = band_edges(rate)
         tilt = [TILT_DB * math.log2(c / 200.0) for c in centers]
-        log("[소리] 시각화를 시작합니다 (%d Hz, %d 채널)" % (rate, channels))
+        detail("[소리] 시각화를 시작합니다 (%d Hz, %d 채널)" % (rate, channels))
 
         buf = []
         data_ptr, frames, flags = c_void_p(), c_uint32(), c_uint32()
