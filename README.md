@@ -147,7 +147,6 @@ Copyright (c) 2026 deuxdoom
 - 사계절 사진은 [Unsplash](https://unsplash.com/) 에서 가져왔으며
   [Unsplash License](https://unsplash.com/license)를 따릅니다. 사진을 갈아 끼우는 방법은
   [사진 출처](assets/wallpapers/README.md)에 적어 두었습니다.
-- 앱 글꼴은 [Pretendard](https://github.com/orioncactus/pretendard), 소개 페이지는
-  [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) 도 씁니다. 둘 다 SIL Open
-  Font License 1.1 을 따릅니다. 앱 글꼴은 프로그램이 돌아가는 동안에만 등록되고
-  윈도우에 설치되지 않습니다.
+- 글꼴은 [Pretendard](https://github.com/orioncactus/pretendard) 이며 SIL Open Font
+  License 1.1 을 따릅니다. 프로그램이 돌아가는 동안에만 등록되고 윈도우에
+  설치되지 않습니다.
