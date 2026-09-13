@@ -13,6 +13,10 @@
 
 ![월페이퍼 화면](wallpaper.png)
 
+[![소개 페이지](https://img.shields.io/badge/WEBSITE-deuxdoom.github.io-ff3b46?style=for-the-badge&logo=github&logoColor=white&labelColor=2f353a)](https://deuxdoom.github.io/Shadowplay-Notifier/)
+
+화면과 기능을 한자리에 모아 둔 **[소개 페이지](https://deuxdoom.github.io/Shadowplay-Notifier/)** 도 있습니다.
+
 ---
 
 ## 📌 간단 소개
