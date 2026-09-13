@@ -1,4 +1,4 @@
-# 오프라인 미리보기를 보조 화면에서 캡처합니다. 본 앱을 먼저 닫으십시오.
+﻿# 오프라인 미리보기를 보조 화면에서 캡처합니다. 본 앱을 먼저 닫으십시오.
 param(
     [int]$Scene = 0,
     [string]$Season = 'autumn',
@@ -30,6 +30,10 @@ if ($Controls) { $wallArguments += ' --controls' }
 $wallProcess = Start-Process pythonw -ArgumentList $wallArguments -WorkingDirectory $wallRoot -WindowStyle Hidden -PassThru
 try {
     Start-Sleep -Milliseconds ([int]($After * 1000))
+    # 시계의 콜론이 켜진 상태로 캡처합니다.
+    while ((Get-Date).Millisecond -lt 100 -or (Get-Date).Millisecond -gt 250) {
+        Start-Sleep -Milliseconds 20
+    }
     $wallBitmap = New-Object System.Drawing.Bitmap $wallWidth,$wallHeight
     $wallGraphics = [System.Drawing.Graphics]::FromImage($wallBitmap)
     try {

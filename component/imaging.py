@@ -377,8 +377,11 @@ def upscale_rgb(pixels, small_w, small_h, width, height):
 
 # 실제 달 사진입니다. 배경을 지우고 정사각형에 꽉 차게 맞춰 두었습니다.
 MOON_IMAGE = "moon.png"
-# 빛이 닿지 않는 면에 덮는 검정의 짙기입니다. 0.9 면 표면이 어렴풋이 남습니다.
-MOON_SHADOW = 0.90
+# 작은 패널에서도 어두운 면의 윤곽과 무늬가 남도록 검정을 65% 덮습니다.
+MOON_SHADOW = 0.65
+# 밝은 부분을 날리지 않고 중간 밝기를 올립니다. 크기별 사진에 한 번만 적용합니다.
+MOON_GAMMA = 0.72
+_MOON_TONE = bytes(round(255 * (v / 255) ** MOON_GAMMA) for v in range(256))
 _moon_surface = {}
 
 
@@ -403,7 +406,10 @@ def _moon_source(size):
     try:
         src = _bitmap_from_bytes(data)
         dst = _draw_scaled(src, size, size)
-        rgba = _to_rgba(dst, size, size)
+        rgba = bytearray(_to_rgba(dst, size, size))
+        for channel in range(3):
+            rgba[channel::4] = rgba[channel::4].translate(_MOON_TONE)
+        rgba = bytes(rgba)
     except Exception as exc:
         log("[그림] 달 사진을 줄이지 못했습니다: %s" % exc)
         return None
@@ -444,11 +450,11 @@ def moon_png(size, phase):
     """오늘 달을 한 장 굽습니다. 알파가 있는 PNG 바이트를 돌려줍니다.
 
     실제 달 사진을 바탕에 깔고, 그 위에 빛이 닿지 않는 면을 계산해 검정을
-    덮습니다. 완전히 지우지 않고 90% 만 덮기 때문에 달의 윤곽과 표면 무늬가
-    어렴풋이 남아, 어디까지 차올랐는지 함께 보입니다.
+    덮습니다. 사진의 중간 밝기를 올리고 검정을 65%만 덮어 작은 화면에서도
+    달의 윤곽과 표면 무늬, 차오른 부분이 함께 보입니다.
 
-    ``phase`` 는 0 이 삭, 0.5 가 보름입니다. 하루에 한 번꼴로만 바뀌므로
-    이 함수도 그만큼만 부르면 됩니다.
+    ``phase`` 는 0 이 삭, 0.5 가 보름입니다. 화면 크기가 바뀔 때와 자정·정오에
+    다시 그립니다.
     """
     n = max(8, int(size))
     source = _moon_source(n)

@@ -5,9 +5,8 @@
 사용자의 글꼴 목록을 건드리지 않습니다.
 
 Pretendard JP 는 한글과 일본어를 한 벌로 담고 있어서, 일본 노래 제목이
-네모 상자나 어울리지 않는 글꼴로 나오는 일을 막아 줍니다. 큰 시계에는
-윈도우의 Segoe UI Light를, 초 표시에는 JetBrains Mono를 씁니다.
-초는 글자 폭이 고르기 때문에 바뀔 때 자리가 흔들리지 않습니다.
+네모 상자나 어울리지 않는 글꼴로 나오는 일을 막아 줍니다. 월페이퍼의
+시계·초·기온도 Pretendard JP를 씁니다. 녹화 화면의 숫자 글꼴은 유지합니다.
 
 글꼴 파일이 없으면 조용히 넘어가고 윈도우에 있는 글꼴로 그립니다.
 """
@@ -23,8 +22,6 @@ FONT_DIR = os.path.join(RESOURCE_DIR, "assets", "fonts")
 BUNDLED = (
     ("PretendardJP-Regular.ttf", "Pretendard JP"),
     ("PretendardJP-Bold.ttf", "Pretendard JP"),
-    ("JetBrainsMono-Regular.ttf", "JetBrains Mono"),
-    ("JetBrainsMono-Bold.ttf", "JetBrains Mono"),
 )
 
 FR_PRIVATE = 0x10

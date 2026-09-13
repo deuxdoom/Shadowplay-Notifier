@@ -21,7 +21,8 @@ class TrayTests(unittest.TestCase):
         self.state = {"recording": False}
         self.tray = TrayIcon(self.root, {
             action: lambda action=action: self.calls.append(action)
-            for action in TrayIcon.COMMANDS.values()}, lambda: self.state)
+            for action in TrayIcon.COMMANDS.values()}, lambda: self.state,
+            lambda: self.state.get("startup", False))
         self.assertTrue(self.tray.available)
 
     def tearDown(self):
@@ -48,7 +49,11 @@ class TrayTests(unittest.TestCase):
                 self.tray._show_menu()
             self.assertEqual(self.calls[-1], action)
         commands = [item[0] for item in self.tray.menu_entries() if item[0]]
-        self.assertEqual(commands, [1, 5, 6, 7])
+        self.assertEqual(commands, [1, 5, 8, 6, 7])
+        for enabled in (False, True, False):
+            self.state["startup"] = enabled
+            entry = next(item for item in self.tray.menu_entries() if item[0] == 8)
+            self.assertEqual(bool(entry[2] & 8), enabled)
 
     def test_explorer_restart_readds_icon(self):
         shell32.Shell_NotifyIconW(2, ctypes.byref(self.tray._data))

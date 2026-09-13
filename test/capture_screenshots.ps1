@@ -1,4 +1,4 @@
-# README 에 넣는 두 장(main.png, wallpaper.png)을 다시 찍습니다.
+﻿# README 에 넣는 두 장(main.png, wallpaper.png)을 다시 찍습니다.
 # 버전을 올릴 때마다 돌려서 화면을 최신으로 맞춥니다.
 #
 #   powershell -ExecutionPolicy Bypass -File test\capture_screenshots.ps1
@@ -78,6 +78,12 @@ function Get-WindowSpot {
 }
 
 function Save-Shot($spot, $name) {
+    # 콜론이 켜진 반주기에 담습니다.
+    if ($name -eq "wallpaper.png") {
+        while ((Get-Date).Millisecond -lt 100 -or (Get-Date).Millisecond -gt 250) {
+            Start-Sleep -Milliseconds 20
+        }
+    }
     $bmp = New-Object System.Drawing.Bitmap $spot[2], $spot[3]
     $g = [System.Drawing.Graphics]::FromImage($bmp)
     $g.CopyFromScreen($spot[0], $spot[1], 0, 0, $bmp.Size)

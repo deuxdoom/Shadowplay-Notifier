@@ -90,8 +90,10 @@ class WallpaperTests(unittest.TestCase):
         for w, h in sizes:
             self.view.resize(w, h)
             self.settle()
+            self.view._blink_clock(True)
             c = self.view.canvas
-            for item in (self.view.date_item, self.view.clock_item, self.view.sec_item,
+            for item in (self.view.date_item, self.view.clock_item, self.view.colon_item,
+                         self.view.minute_item, self.view.sec_item,
                          self.view.temp_item, self.view.desc_item, self.view.meta_item,
                          self.view.meta2_item, self.view.title_item,
                          self.view.album_item, self.view.play_label, self.view.phase_item):
@@ -110,13 +112,76 @@ class WallpaperTests(unittest.TestCase):
 
     def test_only_wall_and_recording_modes_exist(self):
         self.assertEqual(self.view.mode, "wall")
+        c = self.view.canvas
+        version_position = c.coords(self.view.status_ver)
+        self.assertIsNotNone(c.bbox(self.view.status_ver))
         self.view.set_mode("idle")
         self.assertEqual(self.view.mode, "wall")
         self.view.set_mode("rec")
         self.assertEqual(self.view.mode, "rec")
+        self.assertIsNotNone(c.bbox(self.view.status_ver))
+        self.assertEqual(c.coords(self.view.status_ver), version_position)
         self.assertEqual(self.view.canvas.itemcget(self.view.rec_word, "text"),
                          "R E C O R D I N G")
         self.view.set_mode("wall")
+
+    def test_only_colon_blinks_without_moving_digits_or_adding_timers(self):
+        view, c = self.view, self.view.canvas
+        view._set_clock_time(3, 33)
+        items = (view.clock_item, view.colon_item, view.minute_item, view.sec_item)
+        positions = [c.coords(item) for item in items]
+        count = len(c.find_all())
+        timers = len(self.root.tk.call("after", "info"))
+        epoch = time.mktime((2026, 9, 13, 3, 33, 10, 0, 0, -1))
+        for offset, visible in ((.1, True), (.6, False), (1.1, True), (1.6, False)):
+            with patch("component.wallpaper.time.time", return_value=epoch + offset):
+                view._update_clock()
+            self.assertEqual(c.itemcget(view.clock_item, "text"), "03")
+            self.assertEqual(c.itemcget(view.minute_item, "text"), "33")
+            self.assertEqual(c.itemcget(view.sec_item, "text"), "%02d" % (10 + int(offset)))
+            # 배경을 다시 칠해도 깜빡임의 박자를 바꾸지 않습니다.
+            view._paint_foreground()
+            for item in view._clock_blink_items:
+                self.assertEqual(bool(c.itemcget(item, "fill")), visible)
+                if visible:
+                    self.assertIsNotNone(c.bbox(item))
+            self.assertTrue(c.itemcget(view.clock_item, "fill"))
+            self.assertTrue(c.itemcget(view.minute_item, "fill"))
+            self.assertTrue(c.itemcget(view.sec_item, "fill"))
+            self.assertIsNotNone(c.bbox(view.sec_item))
+            self.assertEqual([c.coords(item) for item in items], positions)
+        self.assertEqual(len(c.find_all()), count)
+        self.assertEqual(len(self.root.tk.call("after", "info")), timers)
+        view.set_mode("rec")
+        view._blink_clock(True)
+        for item in (*items, view.colon_shadow, view.minute_shadow):
+            self.assertEqual(c.itemcget(item, "state"), "hidden")
+        view.set_mode("wall")
+
+    def test_clock_stays_left_aligned_and_clear_of_weather(self):
+        view, c = self.view, self.view.canvas
+        for width, height in ((960, 640), (640, 480), (1920, 1080), (1080, 1920)):
+            view.resize(width, height)
+            self.settle()
+            for hour, minute in ((0, 0), (11, 11), (23, 58)):
+                view._set_clock_time(hour, minute)
+                # 왼쪽 여백 보정은 글꼴 크기에 비례합니다. 고정값으로 두면
+                # 시계 크기를 바꿀 때 날짜와의 정렬이 조용히 어긋납니다.
+                bearing = -view._fonts["clock"][0].cget("size") * wallpaper.BEARING
+                self.assertAlmostEqual(c.coords(view.clock_item)[0] + bearing,
+                                       c.coords(view.date_item)[0])
+                self.assertLess(c.bbox(view.minute_item)[2], c.bbox(view.wicon_item)[0])
+                # 큰 글꼴 bbox의 빈 아래 여백은 글획이 아닙니다. 세로 간격은
+                # 실화면에서도 확인하며, 여기서는 파형·달과의 간섭을 검사합니다.
+                self.assertLess(c.bbox(view.sec_item)[3], min(c.bbox(i)[1] for i in view.bar_items))
+                self.assertLess(c.bbox(view.sec_item)[2], c.bbox(view.moon_item)[0])
+        view.resize(960, 640)
+        # 시계는 화면에서 가장 큰 요소로 남되, 지나치게 커지면 디센더 자리가
+        # 함께 늘어 초가 멀어 보이고 날씨까지의 여백도 빠듯해집니다.
+        clock_px = -view._fonts["clock"][0].cget("size")
+        self.assertGreater(clock_px, 150)
+        self.assertLessEqual(clock_px, 170)
+        self.assertGreater(clock_px, -view._fonts["date"][0].cget("size") * 3)
 
     def test_weather_failure_clears_icon_and_resumes_new_provider(self):
         self.weather.current.code = 63
@@ -208,11 +273,13 @@ class WallpaperTests(unittest.TestCase):
         self.assertIsNone(self.view._control_drag(None))
 
     def test_text_contrast_across_all_palettes_and_weather(self):
+        self.view._blink_clock(True)
         minimum = 100
         # 글자 bbox에 포함되는 모든 작은 배경 표본을 검사합니다.
         c = self.view.canvas
         positions = [(c.bbox(item), sky._rgb(color), adaptive) for item, color, adaptive in (
-            (self.view.clock_item, wallpaper.INK, True), (self.view.sec_item, wallpaper.INK_3, True),
+            (self.view.clock_item, wallpaper.INK, True), (self.view.colon_item, wallpaper.INK, True),
+            (self.view.minute_item, wallpaper.INK, True), (self.view.sec_item, wallpaper.INK_3, True),
             (self.view.date_item, wallpaper.INK_2, True), (self.view.meta_item, wallpaper.INK_3, True),
             (self.view.temp_item, wallpaper.INK, True), (self.view.desc_item, wallpaper.INK_2, True),
             (self.view.meta2_item, wallpaper.INK_3, True), (self.view.title_item, wallpaper.INK, False),

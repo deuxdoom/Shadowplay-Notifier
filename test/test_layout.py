@@ -48,7 +48,7 @@ def check_layout(root, app, width, height):
     assert (view.width, view.height) == (width, height)
     assert root.pack_slaves() == [view.canvas]
     assert view.canvas.winfo_ismapped()
-    check_items(view, (view.control_items["close"],))
+    check_items(view, (view.control_items["close"], view.status_ver))
     if app.recording:
         assert view.mode == "rec"
         check_items(view, (view.rec_dot, view.rec_word, view.rec_folder,
@@ -57,8 +57,10 @@ def check_layout(root, app, width, height):
                            view.badge_word, view.status_item, view.status_ver))
     else:
         assert view.mode == "wall"
+        view._blink_clock(True)
         check_items(view, (view.phase_item, view.date_item, view.clock_item,
-                           view.sec_item, view.wicon_item, view.temp_item,
+                           view.colon_item, view.minute_item, view.sec_item,
+                           view.wicon_item, view.temp_item,
                            view.desc_item, view.meta_item, view.meta2_item,
                            view.title_item, view.album_item))
 

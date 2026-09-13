@@ -149,15 +149,13 @@ def main():
 
     def clock():
         hour = SCENES[state["scene"]][0]
-        text = "%02d:%02d" % (int(hour), round((hour % 1) * 60))
-        for item in (view.clock_item, view.clock_shadow):
-            view.canvas.itemconfigure(item, text=text)
+        view._set_clock_time(int(hour), round((hour % 1) * 60))
         month = {"spring": 4, "summer": 7, "autumn": 10, "winter": 1}.get(args.season, 9)
         date = datetime.date(2026, month, 13)
         view.canvas.itemconfigure(view.date_item, text="%d년 %d월 %d일   %s" % (
             date.year, date.month, date.day, wallpaper.DOW[date.weekday()]))
         view.canvas.itemconfigure(view.sec_item, text="%02d" % (int(time.time()) % 60))
-        view._position_seconds()
+        view._blink_clock(time.time() % 1 < .5)
 
     view._update_clock = clock
     wallpaper._now_hour = lambda: SCENES[state["scene"]][0]

@@ -10,8 +10,9 @@ import sys
 import tkinter as tk
 import traceback
 import webbrowser
+from tkinter import messagebox
 
-from component import fonts, instance, version
+from component import fonts, instance, startup, version
 from component.app import MonitorApp
 from component.config import build_settings, load_config, parse_args
 from component.display import enable_dpi_awareness, window_position
@@ -101,12 +102,21 @@ def main(argv=None):
         app.show_window()
         app.open_settings()
 
+    def startup_from_tray():
+        try:
+            startup.set_enabled(not startup.is_enabled())
+        except (OSError, ValueError) as exc:
+            log("[자동 실행] 설정을 바꾸지 못했습니다: %s" % exc)
+            messagebox.showerror("윈도우 시작 시 실행",
+                                 "자동 실행 설정을 바꾸지 못했습니다.\n%s" % exc, parent=root)
+
     tray = TrayIcon(root, {
         "show": app.show_window,
         "settings": settings_from_tray,
+        "startup": startup_from_tray,
         "github": lambda: webbrowser.open("https://github.com/deuxdoom/Shadowplay-Notifier"),
         "quit": close,
-    }, lambda: {"recording": app.recording})
+    }, lambda: {"recording": app.recording}, startup.is_enabled)
     root.protocol("WM_DELETE_WINDOW", hide)
     app.attach_close(hide)
     root.bind("<Control-q>", close)

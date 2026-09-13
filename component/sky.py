@@ -130,7 +130,7 @@ def blend_palette(hour, season=None):
             glow = mix(first.glow, second.glow, g)
             veil = first.veil + (second.veil - first.veil) * g
             veil = max(veil, _needed_veil(round(light, 3), glow))
-            return {"name": name, "label": SEASONS[season][1] + "   /   " + label,
+            return {"name": name, "label": label,
                     "season": season, "light": light, "glow": glow, "veil": veil,
                     "sky": (mix((12, 19, 34), glow, light),) * 4,
                     "stars": round(first.stars + (second.stars - first.stars) * t),

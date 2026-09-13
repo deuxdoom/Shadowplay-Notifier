@@ -73,10 +73,11 @@ _api(shell32, "Shell_NotifyIconW", [w.DWORD, ctypes.POINTER(NOTIFYICONDATA)], w.
 
 
 class TrayIcon:
-    COMMANDS = {1: "show", 5: "settings", 6: "github", 7: "quit"}
+    COMMANDS = {1: "show", 5: "settings", 8: "startup", 6: "github", 7: "quit"}
 
-    def __init__(self, root, actions, state):
+    def __init__(self, root, actions, state, startup_state=None):
         self.root, self.actions, self.state = root, actions, state
+        self.startup_state = startup_state or (lambda: False)
         self._events = deque(maxlen=32)
         self._after_id = None
         self._closed, self.available = False, False
@@ -168,7 +169,9 @@ class TrayIcon:
     def menu_entries(self):
         return [(0, "ShadowPlay Notifier", 2), (0, "", 0x800),
                 (1, "창 열기", 0),
-                (5, "환경설정", 0), (6, "GitHub 프로젝트", 0),
+                (5, "환경설정", 0),
+                (8, "윈도우 시작 시 실행", 8 if self.startup_state() else 0),
+                (6, "GitHub 프로젝트", 0),
                 (0, "", 0x800), (7, "프로그램 종료", 0)]
 
     def _show_menu(self):

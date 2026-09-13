@@ -38,7 +38,6 @@ MONO_FAMILIES = ("Consolas", "D2Coding", "Courier New")
 # 녹화 화면은 맑은 고딕으로 실측해 둔 배치를 그대로 지켜야 하므로 건드리지
 # 않습니다. Pretendard JP 는 한글과 일본어를 한 벌로 담고 있습니다.
 WALL_UI_FAMILIES = ("Pretendard JP", "맑은 고딕", "Malgun Gothic", "Segoe UI")
-WALL_MONO_FAMILIES = ("JetBrains Mono", "Consolas", "D2Coding", "Courier New")
 
 
 def pick_font(root, families, size, weight="normal"):

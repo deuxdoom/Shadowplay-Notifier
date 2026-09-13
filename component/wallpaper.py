@@ -9,12 +9,12 @@ import time
 import tkinter as tk
 from concurrent.futures import ThreadPoolExecutor
 
-from . import imaging, sky, weather, weather_icons
+from . import imaging, sky, version, weather, weather_icons
 from .atmosphere import Atmosphere
 from .audio import BARS
 from .paths import log
 from .text import fit_text
-from .theme import WALL_UI_FAMILIES, WALL_MONO_FAMILIES, pick_font
+from .theme import WALL_UI_FAMILIES, pick_font
 
 BASE_W, BASE_H = 960, 640
 COVER_SIZE = 112
@@ -39,7 +39,10 @@ REC_TIME_INK = "#ff6b6b"
 REC_BADGE_BG, REC_BADGE_EDGE = "#bf2a2a", "#ff9b9b"
 LOG_TIME_INK, STATUS_INK = "#8a94a6", "#77839a"
 LOG_START_INK, LOG_STOP_INK = "#ff8080", "#7cc4f7"
-CLOCK_FAMILIES = ("Segoe UI Light", "Segoe UI", "Pretendard JP", "Arial")
+REC_NUMERIC_FAMILIES = ("Segoe UI Light", "Segoe UI", "Pretendard JP", "Arial")
+# Pretendard 숫자가 글자 상자 왼쪽에 두는 여백입니다. 글꼴 크기에 대한 비율이며,
+# 시계를 날짜와 왼쪽 정렬할 때 이만큼 빼 줍니다.
+BEARING = 0.061
 DOW = ("월요일", "화요일", "수요일", "목요일", "금요일", "토요일", "일요일")
 
 
@@ -69,6 +72,8 @@ class WallpaperView:
         self._levels = [0.] * BARS
         self._track_version = self._weather_version = -1
         self._last_second = None
+        self._clock_blink_on = True
+        self._clock_blink_ink = {}
         self._fonts = {}
         self._cover_data = None
         self._cover_render_key = None
@@ -116,12 +121,22 @@ class WallpaperView:
         # 때는 작고 멀어서 읽히지 않았습니다.
         self.phase_item = self._text(self._font("phase", -20), INK_3)
         self.date_item = self._text(self._font("date", -36), INK_2)
-        f_clock = self._font("clock", -182, CLOCK_FAMILIES)
+        f_clock = self._font("clock", -168)
         self.clock_shadow = self._text(f_clock, "#080b12")
         self.clock_item = self._text(f_clock)
-        self.sec_item = self._text(self._font("sec", -24, WALL_MONO_FAMILIES), INK_3)
+        self.colon_shadow = self._text(f_clock, "#080b12", ":", anchor="center")
+        self.colon_item = self._text(f_clock, text=":", anchor="center")
+        self.minute_shadow = self._text(f_clock, "#080b12")
+        self.minute_item = self._text(f_clock)
+        self._clock_parts = ((self.clock_item, self.clock_shadow),
+                             (self.colon_item, self.colon_shadow),
+                             (self.minute_item, self.minute_shadow))
+        self.sec_item = self._text(self._font("sec", -30), INK_3)
+        self._clock_blink_items = (self.colon_item, self.colon_shadow)
+        self._clock_blink_ink = {item: c.itemcget(item, "fill")
+                                 for item in self._clock_blink_items}
         self.wicon_item = c.create_image(0, 0, anchor="center")
-        self.temp_item = self._text(self._font("temp", -94, CLOCK_FAMILIES), text="—°", anchor="e")
+        self.temp_item = self._text(self._font("temp", -94), text="—°", anchor="e")
         self.desc_item = self._text(self._font("desc", -29), INK_2, "날씨 연결 중", anchor="e")
         self.meta_item = self._text(self._font("meta", -24), INK_3, anchor="e")
         self.meta2_item = self._text(self._fonts["meta"][0], INK_3, anchor="e")
@@ -171,10 +186,10 @@ class WallpaperView:
                                    REC_RED, tag="reconly")
         self.rec_folder = self._text(self._font("recfolder", -40), INK,
                                      tag="reconly")
-        f_time = self._font("rectime", -148, CLOCK_FAMILIES)
+        f_time = self._font("rectime", -148, REC_NUMERIC_FAMILIES)
         self.rec_time_shadow = self._text(f_time, "#080b12", tag="reconly")
         self.rec_time = self._text(f_time, REC_TIME_INK, tag="reconly")
-        self.rec_size = self._text(self._font("recsize", -88, CLOCK_FAMILIES),
+        self.rec_size = self._text(self._font("recsize", -88, REC_NUMERIC_FAMILIES),
                                    INK, anchor="e", tag="reconly")
         self.rec_unit = self._text(self._font("recunit", -34), INK_3,
                                    anchor="e", tag="reconly")
@@ -202,12 +217,13 @@ class WallpaperView:
         self.status_item = self._text(self._font("status", -18), STATUS_INK,
                                       tag="reconly")
         self.status_ver = self._text(self._font("statusver", -16), "#5a6478",
-                                     anchor="e", tag="reconly")
+                                     text=version.label(), anchor="e")
         c.itemconfigure("reconly", state="hidden")
 
         # 월페이퍼에서만 보이는 것들을 한데 묶어 둡니다.
         for item in (self.phase_item, self.date_item, self.clock_item,
-                     self.clock_shadow, self.sec_item, self.wicon_item,
+                     self.clock_shadow, self.colon_item, self.colon_shadow,
+                     self.minute_item, self.minute_shadow, self.sec_item, self.wicon_item,
                      self.temp_item, self.desc_item, self.meta_item,
                      self.meta2_item, self.moon_item, self.cover_mat,
                      self.record_center, self.cover_item, self.play_label,
@@ -237,10 +253,8 @@ class WallpaperView:
         # 시계가 가져갑니다.
         c.coords(self.phase_item, x, 52 * sy)
         c.coords(self.date_item, x, 96 * sy)
-        # 기준선 대신 시각적 중심으로 놓아 Windows 글꼴 여백을 흡수합니다.
-        c.coords(self.clock_item, x - 8 * s, 248 * sy)
-        c.coords(self.clock_shadow, x - 8 * s + s, 248 * sy + 2 * s)
         self._weather_center = (right - 268 * s, 206 * sy)
+        self._place_clock()
         c.coords(self.wicon_item, *self._weather_center)
         c.coords(self.temp_item, right, 206 * sy)
         c.coords(self.desc_item, right, 288 * sy)
@@ -266,7 +280,55 @@ class WallpaperView:
         self._place_moon()
         self._place_recording()
         self._fit_track()
-        self._position_seconds()
+
+    def _place_clock(self):
+        """시계를 날짜와 왼쪽 정렬하고, 초는 그 오른쪽에 베이스라인을 맞춰 둡니다."""
+        c, s, sy = self.canvas, self.scale, self.scale_y
+        font, base = self._fonts["clock"]
+        sec_font = self._fonts["sec"][0]
+        size = max(8, round(-base * s))
+        # 큰 Pretendard 숫자의 왼쪽 글꼴 여백을 빼 날짜의 글획과 맞춥니다.
+        # 이 여백은 글꼴 크기에 비례하므로 고정값으로 두면 시계 크기를 바꿀 때
+        # 날짜와의 왼쪽 정렬이 어긋납니다.
+        left = 60 * self.scale_x - size * BEARING
+        limit = self._weather_center[0] - WICON_SIZE * s / 2 - left - 12 * s
+        # 초가 시계 오른쪽에 서므로 그 폭과 사이 간격까지 넣고 줄여야 날씨
+        # 아이콘과 부딪히지 않습니다. 폭은 가장 넓은 두 자리를 기준으로 잡습니다.
+        sec_gap = 16 * s
+        sec_width = max(sec_font.measure("%02d" % n) for n in range(60))
+        while True:
+            font.configure(size=-size)
+            hour_width = max(font.measure("%02d" % n) for n in range(24))
+            minute_width = max(font.measure("%02d" % n) for n in range(60))
+            colon_width = round(font.measure(":") * .8)
+            width = hour_width + colon_width + minute_width
+            if width + sec_gap + sec_width <= limit or size <= 8:
+                break
+            size -= 1
+        self._clock_left, self._clock_colon_width = left, colon_width
+        self._position_clock()
+        # 초의 베이스라인을 시계의 베이스라인과 맞춥니다. 두 글자가 같은 줄에
+        # 앉아 보이게 하려면 글자 상자 가운데가 아니라 베이스라인을 맞춰야 합니다.
+        baseline = (248 * sy - font.metrics("linespace") / 2
+                    + font.metrics("ascent"))
+        c.coords(self.sec_item, left + width + sec_gap,
+                 baseline + sec_font.metrics("linespace") / 2
+                 - sec_font.metrics("ascent"))
+        c.itemconfigure(self.sec_item, anchor="w")
+
+    def _position_clock(self):
+        c, s, sy = self.canvas, self.scale, self.scale_y
+        font = self._fonts["clock"][0]
+        left, colon_width = self._clock_left, self._clock_colon_width
+        hour_width = font.measure(c.itemcget(self.clock_item, "text") or "00")
+        hour_end = left + hour_width
+        # Pretendard의 콜론을 숫자 높이의 시각적 가운데로 올립니다.
+        positions = ((left, 248 * sy),
+                     (hour_end + colon_width / 2, 248 * sy + font.cget("size") * .105),
+                     (hour_end + colon_width, 248 * sy))
+        for (item, shadow), (x, y) in zip(self._clock_parts, positions):
+            c.coords(item, x, y)
+            c.coords(shadow, x + s, y + 2 * s)
 
     def _place_recording(self):
         """녹화 화면의 자리입니다. 월페이퍼와 같은 여백을 씁니다."""
@@ -570,7 +632,12 @@ class WallpaperView:
 
     def _paint_foreground(self):
         c = self.canvas
-        items = (self.phase_item, self.date_item, self.clock_item, self.sec_item,
+        # 숨은 글자는 bbox가 없으므로 색을 계산하는 동안만 글획을 복원합니다.
+        # 이 함수 안에서는 화면 갱신이 없어 꺼진 반주기에 번쩍이지 않습니다.
+        for item in self._clock_blink_items:
+            c.itemconfigure(item, fill=self._clock_blink_ink[item])
+        items = (self.phase_item, self.date_item, self.clock_item, self.colon_item,
+                 self.minute_item, self.sec_item,
                  self.temp_item, self.desc_item, self.meta_item, self.meta2_item,
                  self.rec_folder, self.rec_size, self.rec_unit, self.rec_rate,
                  self.rec_grow, self.rec_file, self.tooltip, *self.control_items.values())
@@ -578,7 +645,11 @@ class WallpaperView:
             color = sky.foreground(self._bg_pixels, c.bbox(item), self.width, self.height)
             c.itemconfigure(item, fill=color)
         # 밝은 낮에 검은 그림자가 시계 글획을 두껍게 만들지 않도록 맞춥니다.
-        c.itemconfigure(self.clock_shadow, fill=c.itemcget(self.clock_item, "fill"))
+        for item, shadow in self._clock_parts:
+            c.itemconfigure(shadow, fill=c.itemcget(item, "fill"))
+        self._clock_blink_ink = {item: c.itemcget(item, "fill")
+                                 for item in self._clock_blink_items}
+        self._blink_clock(self._clock_blink_on, force=True)
         color = sky.foreground(self._bg_pixels, c.bbox(self.rec_time), self.width, self.height)
         c.itemconfigure(self.rec_time, fill="#b91f35" if color == "#030508" else REC_TIME_INK)
         current = self.weather.current if self.weather else None
@@ -652,16 +723,16 @@ class WallpaperView:
         self._after_id = self.parent.after(max(1, self.period - round(elapsed)), self._tick)
 
     def _update_clock(self):
-        now = time.localtime()
+        timestamp = time.time()
+        now = time.localtime(timestamp)
+        self._blink_clock(timestamp % 1 < .5)
         stamp = (now.tm_year, now.tm_yday, now.tm_hour, now.tm_min, now.tm_sec)
         if stamp == self._last_second:
             return
         minute_changed = self._last_second is None or stamp[:-1] != self._last_second[:-1]
         self._last_second = stamp
         if minute_changed:
-            text = time.strftime("%H:%M", now)
-            for item in (self.clock_item, self.clock_shadow):
-                self.canvas.itemconfigure(item, text=text)
+            self._set_clock_time(now.tm_hour, now.tm_min)
             self.canvas.itemconfigure(self.date_item, text="%d년 %d월 %d일   %s" %
                                       (now.tm_year, now.tm_mon, now.tm_mday, DOW[now.tm_wday]))
             # 자정이나 정오를 지났으면 달을 다시 그립니다.
@@ -670,13 +741,21 @@ class WallpaperView:
                 self._moon_slot = slot
                 self._place_moon()
         self.canvas.itemconfigure(self.sec_item, text="%02d" % now.tm_sec)
-        self._position_seconds()
 
-    def _position_seconds(self):
-        box = self.canvas.bbox(self.clock_item)
-        if box:
-            self.canvas.coords(self.sec_item, box[2] + 14 * self.scale,
-                               298 * self.scale_y)
+    def _set_clock_time(self, hour, minute):
+        for items, text in ((self._clock_parts[0], "%02d" % hour),
+                            (self._clock_parts[2], "%02d" % minute)):
+            for item in items:
+                self.canvas.itemconfigure(item, text=text)
+        self._position_clock()
+
+    def _blink_clock(self, visible, force=False):
+        if not force and visible == self._clock_blink_on:
+            return
+        self._clock_blink_on = visible
+        # fill만 비우면 좌표와 wall/rec 표시 상태가 그대로 유지됩니다.
+        for item in self._clock_blink_items:
+            self.canvas.itemconfigure(item, fill=self._clock_blink_ink[item] if visible else "")
 
     def _fit_track(self):
         for key, raw, items in (
