@@ -9,14 +9,16 @@ ShadowPlay(NVIDIA App) 녹화 상태를 감시해 보조 디스플레이에 표�
 import sys
 import tkinter as tk
 import traceback
+import webbrowser
 
-from component import instance, version
+from component import fonts, instance, version
 from component.app import MonitorApp
 from component.config import build_settings, load_config, parse_args
 from component.display import enable_dpi_awareness, window_position
 from component.paths import install_excepthook, log
 from component.theme import C_BG, C_MUTED, WIN_H, WIN_W
 from component.watcher import WatchSupervisor
+from component.tray import TrayIcon
 
 
 def place_window(root, settings):
@@ -44,6 +46,9 @@ def main(argv=None):
     settings = build_settings(load_config(), parse_args(argv))
 
     enable_dpi_awareness()
+    # 묶어 온 글꼴을 이 프로그램에서만 쓰도록 등록합니다. 창을 만들기 전에
+    # 해야 Tk 가 글꼴 목록에 넣습니다.
+    fonts.load()
     root = tk.Tk()
     root.title(version.title())
     root.configure(bg=C_BG)
@@ -66,17 +71,50 @@ def main(argv=None):
     app = MonitorApp(root, settings)
     supervisor = WatchSupervisor(app.queue.put)
     app.settings_callback = supervisor.start
+    tray = None
+    closing = False
 
     def close(_event=None):
+        nonlocal closing
+        if closing:
+            return
+        closing = True
+        if tray is not None:
+            tray.close()
         app.stop_event.set()
         supervisor.stop()
+        app.stop_wallpaper()
         try:
             root.destroy()
         except tk.TclError:
             pass
 
-    root.protocol("WM_DELETE_WINDOW", close)
-    app.attach_close(close)
+    def hide(_event=None):
+        if tray is not None and tray.available:
+            app.hide_window()
+        else:
+            close()
+
+    def select_view(mode):
+        app.set_view_mode(mode)
+        app.show_window()
+
+    def settings_from_tray():
+        app.show_window()
+        app.open_settings()
+
+    tray = TrayIcon(root, {
+        "show": app.show_window,
+        "wallpaper": lambda: select_view("wallpaper"),
+        "monitor": lambda: select_view("monitor"),
+        "auto": lambda: select_view("auto"),
+        "settings": settings_from_tray,
+        "github": lambda: webbrowser.open("https://github.com/deuxdoom/Shadowplay-Notifier"),
+        "quit": close,
+    }, lambda: {"mode": app.view_mode, "recording": app.recording})
+    root.protocol("WM_DELETE_WINDOW", hide)
+    app.attach_close(hide)
+    root.bind("<Control-q>", close)
     if settings["borderless"]:
         # 타이틀바가 없으면 창이 초점을 받지 못해 Esc 가 닿지 않습니다.
         def grab_focus():
@@ -95,8 +133,11 @@ def main(argv=None):
     try:
         root.mainloop()
     finally:
+        tray.close()
         app.stop_event.set()
         supervisor.stop()
+        app.stop_wallpaper()
+        fonts.unload()
         log("앱 종료")
     return 0
 

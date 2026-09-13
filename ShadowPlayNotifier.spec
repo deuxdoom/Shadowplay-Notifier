@@ -62,7 +62,10 @@ a = Analysis(
     [os.path.join(SPECPATH, "ShadowPlayNotifier.py")],
     pathex=[SPECPATH],
     binaries=[],
-    datas=[],
+    # 월페이퍼 화면에 쓰는 글꼴입니다. 설치하지 않고 실행할 때만 등록하므로
+    # EXE 안에 함께 넣습니다. component/fonts.py 가 풀린 자리에서 읽습니다.
+    datas=[(os.path.join(SPECPATH, "assets", "fonts"),
+            os.path.join("assets", "fonts"))] + ([(ICON, ".")] if os.path.isfile(ICON) else []),
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

@@ -4,6 +4,28 @@
 실제 녹화 결과물에는 손대지 않습니다. `trace_growth.py` 는 실제 녹화 폴더를 보지만
 읽기만 합니다. GUI 확인 도구는 보조 디스플레이(기본값 1번 모니터)에 창을 강제로 띄웁니다.
 
+## 월페이퍼 디자인 검증
+
+`python test/test_wallpaper.py`는 실제 Tk와 GDI+로 11개 해상도, 긴 한글·일본어 제목,
+36개 시간대·날씨 조합의 글자 대비, 커버 교체와 반복 전환의 이미지·도형·예약
+콜백 수, 간헐적 효과와 녹화/전체화면 전환을 검사합니다. 네트워크는 사용하지 않습니다.
+
+`python test/wallpaper_preview.py --seconds 180`은 보조 디스플레이에 디자인
+미리보기를 띄웁니다. 방향키는 시간·날씨 전환, Space는 음악 유무, F11은 확대,
+Esc는 종료입니다. `--scene 0`부터 `8`까지 여명·한낮·노을·밤·비·안개·눈·뇌우·흐림을
+고를 수 있으며 `--size 1920x1080`, `--empty`도 지원합니다. 미리보기 곡과 날씨는
+검증용 가상 데이터입니다.
+
+`python test/wallpaper_preview.py --seconds 300 --profile --cycle`은 장면과 음악,
+화면의 정지·재개를 반복하며 CPU, 메모리, Windows 손잡이, GDI, Tk 이미지와 도형 수를
+`.Codex/wallpaper-soak.json`에 기록합니다. 24시간 검증은 `--seconds 86400`으로
+별도로 실행할 수 있습니다. 실행 중인 본 앱을 먼저 닫으십시오.
+
+`python test/test_tray.py`는 실제 트레이 등록·제거, 숨은 창 복원 메시지, 메뉴 명령과
+체크 표시, Explorer 재시작 알림에 따른 재등록, 반복 종료와 자원 해제를 검사합니다.
+`python test/build_icon.py`는 `assets/appicon.svg`에서 EXE·트레이용 ICO와 환경설정
+아이콘을 함께 만듭니다. Pillow는 이 작성 도구에만 필요합니다.
+
 ## test_detection.py
 
 폴링 상태 기계가 녹화 시작과 중단을 제대로 판정하는지 확인합니다. 창을 띄우지 않습니다.

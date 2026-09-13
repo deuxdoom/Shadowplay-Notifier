@@ -14,7 +14,11 @@ import traceback
 from collections import deque
 
 from . import icons, version
+from .audio import AudioLevels
 from .display import monitor_for_point, window_position
+from .nowplaying import NowPlaying
+from .wallpaper import WallpaperView
+from .weather import WeatherWatch
 from .paths import log
 from .scan import human, hms
 from .settings_dialog import SettingsDialog
@@ -31,6 +35,15 @@ BUTTON_W = 42
 BUTTON_ZONE_H = 44
 
 
+class _FakeConfigure:
+    """지금 창 크기로 배치를 다시 잡을 때 쓰는 가짜 Configure 사건입니다."""
+
+    def __init__(self, widget):
+        self.widget = widget
+        self.width = widget.winfo_width()
+        self.height = widget.winfo_height()
+
+
 class MonitorApp:
     def __init__(self, root, settings):
         self.root = root
@@ -40,6 +53,8 @@ class MonitorApp:
         self.borderless = settings["borderless"]
 
         self.close_callback = None
+        self.view_mode = "auto" if settings.get("wallpaper", True) else "monitor"
+        self.hidden_to_tray = False
         self.settings_callback = None
         self.fullscreen = False
         self.saved_rect = (0, 0, WIN_W, WIN_H)
@@ -65,6 +80,16 @@ class MonitorApp:
         self._refresh_status()
         self._enable_drag()
         self.root.bind("<Configure>", self._resize_layout, add="+")
+
+        # 녹화를 기다리는 동안 띄우는 월페이퍼 화면입니다. 설정으로 끌 수 있고,
+        # 녹화가 잡히면 이 화면을 멈추고 감지 화면으로 바꿉니다.
+        self.wallpaper = None
+        self._wall_audio = None
+        self._wall_track = None
+        self._wall_weather = None
+        if self.settings.get("wallpaper", True):
+            self._ensure_wallpaper()
+            self._enter_wallpaper()
 
         self.root.after(50, self._pulse)
         self.root.after(100, self._drain)
@@ -313,6 +338,12 @@ class MonitorApp:
         if event.widget is not self.root or min(size) <= 1 or size == self._layout_size:
             return
         self._layout_size = size
+        if self.wallpaper is not None:
+            self.wallpaper.resize(event.width, event.height)
+            if self.wallpaper.running:
+                # 월페이퍼가 떠 있는 동안에는 감지 화면 위젯이 붙어 있지
+                # 않으므로 아래 계산을 할 필요가 없습니다.
+                return
         sx, sy = event.width / WIN_W, event.height / WIN_H
         self._scale_x, self._scale_y = sx, sy
         scale = min(sx, sy)
@@ -429,16 +460,105 @@ class MonitorApp:
         self._refresh_status()
         if self.settings_callback:
             self.settings_callback(settings)
+        if settings.get("wallpaper", True) != previous.get("wallpaper", True):
+            self.set_view_mode("auto" if settings.get("wallpaper", True) else "monitor")
+        elif any(settings.get(key) != previous.get(key) for key in
+                 ("latitude", "longitude", "wallpaper_fps")):
+            self._leave_wallpaper()
+            self._sync_view()
 
     # ------------------------------------------------------------ 갱신
 
     def _pulse(self):
-        if self.recording:
+        if self.recording and not self.hidden_to_tray and self.banner.winfo_ismapped():
             phase = (time.time() % 1.0) * 2.0 * math.pi
             k = 0.5 - 0.5 * math.cos(phase)
             self.banner.configure(bg=mix(C_REC_DIM, C_REC, k))
             self.banner.itemconfigure(self.dot, fill=mix("#ff8787", "#ffffff", k))
         self.root.after(50, self._pulse)
+
+    # ------------------------------------------------------------ 월페이퍼
+
+    def _ensure_wallpaper(self):
+        if self.wallpaper is None:
+            self.wallpaper = WallpaperView(
+                self.root, self.settings,
+                self.root.winfo_width() if self.root.winfo_width() > 1 else WIN_W,
+                self.root.winfo_height() if self.root.winfo_height() > 1 else WIN_H,
+                actions={"settings": self.open_settings,
+                         "full": self.toggle_fullscreen,
+                         "close": lambda: self.close_callback() if self.close_callback else None})
+
+    def set_view_mode(self, mode):
+        if mode not in ("auto", "wallpaper", "monitor"):
+            raise ValueError("Unknown view mode: " + str(mode))
+        self.view_mode = mode
+        self._sync_view()
+
+    def _sync_view(self):
+        if self.hidden_to_tray:
+            return
+        if self.view_mode == "wallpaper" or (self.view_mode == "auto" and not self.recording):
+            self._ensure_wallpaper()
+            self._enter_wallpaper()
+        else:
+            self._leave_wallpaper()
+
+    def hide_window(self):
+        self.hidden_to_tray = True
+        self.root.withdraw()
+        self._leave_wallpaper()
+
+    def show_window(self):
+        self.hidden_to_tray = False
+        self.root.deiconify()
+        self._sync_view()
+        self.root.lift()
+        self.root.focus_force()
+
+    def _enter_wallpaper(self):
+        """녹화가 없을 때 띄우는 화면으로 넘어갑니다."""
+        if self.hidden_to_tray or self.wallpaper is None or self.wallpaper.running:
+            return
+        for widget in (self.banner, self.detail, self.log_frame, self.status_row):
+            widget.pack_forget()
+        self._wall_audio = AudioLevels(fps=self.settings.get("wallpaper_fps", 30))
+        self._wall_audio.start()
+        self._wall_track = NowPlaying(interval=1.0)
+        self._wall_track.start()
+        self._wall_weather = WeatherWatch(
+            self.settings.get("latitude", 37.5665),
+            self.settings.get("longitude", 126.9780))
+        self._wall_weather.start()
+        self.wallpaper.start(audio=self._wall_audio,
+                             nowplaying=self._wall_track,
+                             weather=self._wall_weather)
+
+    def _leave_wallpaper(self):
+        """감지 화면으로 되돌립니다. 소리 잡기와 조회도 모두 멈춥니다."""
+        if self.wallpaper is None or not self.wallpaper.running:
+            return
+        self.wallpaper.stop()
+        for thread in (self._wall_audio, self._wall_track, self._wall_weather):
+            if thread is not None:
+                thread.stop()
+        self._wall_audio = self._wall_track = self._wall_weather = None
+        # 원래 순서대로 다시 쌓습니다. 상태 표시줄만 아래쪽에 붙습니다.
+        self.banner.pack(side="top", fill="x")
+        self.detail.pack(side="top", fill="x")
+        self.log_frame.pack(side="top", fill="x", padx=16, pady=(4, 0))
+        self.status_row.pack(side="bottom", fill="x", padx=18, pady=(3, 5))
+        self._layout_size = None
+        self.root.update_idletasks()
+        self._resize_layout(_FakeConfigure(self.root))
+
+    def stop_wallpaper(self):
+        """창을 닫을 때 부릅니다."""
+        if self.wallpaper is None:
+            return
+        self._leave_wallpaper()
+        self.wallpaper.destroy()
+        self.wallpaper = None
 
     def _set_recording(self, active):
         if active == self.recording:
@@ -454,6 +574,7 @@ class MonitorApp:
                                       fill=C_DIM)
             self.banner.itemconfigure(self.banner_sub, text="", fill=C_DIM)
             self._show_idle()
+        self._sync_view()
 
     def _show_folder(self, text, color):
         """폴더 이름이 길면 자르지 않고 글자 크기를 줄여서 끝까지 보여 줍니다."""

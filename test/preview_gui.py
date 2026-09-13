@@ -35,6 +35,7 @@ SETTINGS = {
     "interval": 1.0, "stall": 8.0, "min_size": 1048576,
     "min_growth": 262144, "recursive": True, "beep": False,
     "topmost": False, "borderless": BORDERLESS, "monitor": MONITOR,
+    "wallpaper": False,
 }
 
 

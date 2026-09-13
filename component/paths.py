@@ -18,7 +18,19 @@ def base_dir():
     return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
+def resource_dir():
+    """글꼴처럼 함께 묶어 배포하는 자료가 들어 있는 곳입니다.
+
+    ``base_dir`` 과 달리 onefile 로 묶으면 임시 추출 폴더를 가리킵니다.
+    설정과 로그는 EXE 옆에, 읽기만 하는 자료는 여기에 있습니다.
+    """
+    if getattr(sys, "frozen", False):
+        return getattr(sys, "_MEIPASS", os.path.dirname(sys.executable))
+    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
 BASE_DIR = base_dir()
+RESOURCE_DIR = resource_dir()
 CONFIG_PATH = os.path.join(BASE_DIR, "config.json")
 LOG_PATH = os.path.join(BASE_DIR, "monitor.log")
 

@@ -1,0 +1,302 @@
+"""실제 Tk/GDI+를 사용하는 월페이퍼 회귀 검사. 네트워크·녹화 파일 접근 없음."""
+
+import gc
+import math
+import sys
+import time
+import unittest
+from unittest.mock import patch
+from pathlib import Path
+from types import SimpleNamespace
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+import tkinter as tk
+from component import display, fonts, sky, wallpaper
+from component.nowplaying import Track
+from component.weather import Weather
+from component.app import MonitorApp
+from component.config import build_settings, parse_args
+from wallpaper_preview import demo_cover
+
+
+def luminance(rgb):
+    linear = [(v / 255 / 12.92 if v / 255 <= .04045 else
+               ((v / 255 + .055) / 1.055) ** 2.4) for v in rgb]
+    return sum(a * b for a, b in zip(linear, (.2126, .7152, .0722)))
+
+
+class WallpaperTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        display.enable_dpi_awareness()
+        fonts.load()
+
+    def setUp(self):
+        self.root = tk.Tk()
+        self.root.withdraw()
+        self.errors = []
+        self.root.report_callback_exception = lambda *args: self.errors.append(args)
+        self.track = SimpleNamespace(version=1, track=Track(
+            "米津玄師", "夜鷹 - Yodaka", "Yodaka - Single", demo_cover(self.root), (170, 120, 90)))
+        self.weather = SimpleNamespace(version=1, current=Weather(
+            ok=True, temp=18, tmax=25, tmin=17, code=0, humidity=84, precip=10))
+        self.audio = SimpleNamespace(levels=[.4] * 12)
+        self.default_images = set(self.root.tk.call("image", "names"))
+        self.view = wallpaper.WallpaperView(self.root, {})
+        self.view.start(self.audio, self.track, self.weather)
+        self.settle()
+
+    def tearDown(self):
+        self.view.destroy()
+        self.root.destroy()
+        self.assertEqual(self.errors, [])
+
+    def settle(self):
+        deadline = time.perf_counter() + 8
+        while time.perf_counter() < deadline:
+            self.root.update()
+            if self.view._fade_target is not None:
+                self.view._fade_at -= 3
+                self.view._paint_at = 0
+            if self.view._future is None and self.view._fade_target is None:
+                return
+            time.sleep(.005)
+        self.fail("scene did not settle")
+
+    def test_time_palette_continuous_through_day_and_midnight(self):
+        previous = sky.blend_palette(0)
+        for minute in range(1, 1441):
+            current = sky.blend_palette(minute / 60)
+            self.assertLessEqual(max(abs(a - b) for a, b in
+                                     zip(previous["glow"], current["glow"])), 1)
+            previous = current
+
+    def test_layout_and_square_artwork_at_eleven_sizes(self):
+        sizes = ((960, 640), (1920, 1080), (2560, 1440), (3840, 2160),
+                 (2560, 1080), (3440, 1440), (1080, 1920), (720, 1280),
+                 (640, 480), (1280, 800), (960, 640))
+        self.track.track.title = "아주 긴 한국어 제목과 日本語の長い曲名 — A very long title " * 5
+        self.track.track.artist = "아티스트 · アーティスト " * 8
+        self.track.track.album = "Album " * 30
+        self.view._apply_track(force=True)
+        for w, h in sizes:
+            self.view.resize(w, h)
+            self.settle()
+            c = self.view.canvas
+            for item in (self.view.date_item, self.view.clock_item, self.view.sec_item,
+                         self.view.temp_item, self.view.desc_item, self.view.meta_item,
+                         self.view.meta2_item, self.view.title_item, self.view.artist_item,
+                         self.view.album_item, self.view.play_label, self.view.phase_item):
+                box = c.bbox(item)
+                self.assertIsNotNone(box)
+                with self.subTest(size=(w, h), text=c.itemcget(item, "text")):
+                    self.assertGreaterEqual(box[0], 0)
+                    self.assertGreaterEqual(box[1], 0)
+                    self.assertLessEqual(box[2], w)
+                    self.assertLessEqual(box[3], h)
+            cover = self.view._cover_image
+            self.assertEqual(cover.width(), cover.height())
+            self.assertEqual(cover.width(), round(112 * self.view.scale))
+            self.assertLess(c.bbox(self.view.sec_item)[2], c.bbox(self.view.wicon_item)[0])
+            self.assertLess(c.bbox(self.view.title_item)[3], c.bbox(self.view.artist_item)[1])
+
+    def test_weather_failure_clears_icon_and_resumes_new_provider(self):
+        self.weather.current.code = 63
+        self.view._apply_weather(force=True)
+        self.assertEqual(self.view._sky_key, "rain")
+        self.weather.current = Weather()
+        self.weather.version += 1
+        self.view._apply_weather()
+        self.assertEqual(self.view._sky_key, "clear")
+        self.assertIsNone(self.view._wicon_image)
+        self.assertEqual(self.view.canvas.itemcget(self.view.meta_item, "text"), "")
+        self.view.stop()
+        self.track = SimpleNamespace(version=1, track=Track("New artist", "New title"))
+        self.view.start(nowplaying=self.track)
+        self.assertEqual(self.view.canvas.itemcget(self.view.title_item, "text"), "New title")
+        self.assertIsNone(self.view._cover_image)
+
+    def test_large_weather_and_permanent_close_button(self):
+        c = self.view.canvas
+        self.view._show_controls(False)
+        self.assertEqual(c.itemcget(self.view.control_items["close"], "state"), "normal")
+        self.assertGreaterEqual(abs(self.view._fonts["date"][0].cget("size")), 32)
+        self.assertGreaterEqual(self.view._wicon_image.width(), 100)
+        for temp in (-99, -18, 0, 18, 48):
+            self.weather.current.temp = temp
+            self.view._apply_weather(force=True)
+            self.assertLess(c.bbox(self.view.wicon_item)[2], c.bbox(self.view.temp_item)[0])
+
+    def test_image_item_and_callback_counts_under_replacement(self):
+        original_items = len(self.view.canvas.find_all())
+        original_images = len(self.root.tk.call("image", "names"))
+        original_fonts = len(self.root.tk.call("font", "names"))
+        # 기존 커버와 수신 실패를 교대로 160회. 같은 Tk 이미지에 덮어쓰기만
+        # 하는 검사가 아니라 실제 JPEG/PNG 변환·할당·삭제 경로를 거칩니다.
+        cover = self.track.track.cover
+        for i in range(160):
+            self.view._set_cover(cover if i % 2 else None)
+            self.weather.current.code = (0, 63, 73, 45, 95, 3)[i % 6]
+            self.view._apply_weather(force=True)
+            self.view.atmosphere.configure(960, 640, sky.blend_palette(i % 24),
+                                           self.view._sky_key, self.view._bg_pixels, 0)
+            self.view.atmosphere.update(i * 7.5)
+            self.assertEqual(len(self.view.canvas.find_all()), original_items)
+            self.assertLessEqual(len(self.root.tk.call("image", "names")), original_images)
+        self.settle()
+        self.assertEqual(len(self.root.tk.call("font", "names")), original_fonts)
+        for _ in range(30):
+            self.view.stop()
+            self.assertEqual(len(self.root.tk.call("after", "info")), 0)
+            self.view.start(self.audio, self.track, self.weather)
+            self.view.start(self.audio, self.track, self.weather)
+            self.assertEqual(len(self.root.tk.call("after", "info")), 1)
+        self.settle()
+        self.view.destroy()
+        gc.collect()
+        self.assertEqual(len(self.root.tk.call("after", "info")), 0)
+        self.assertEqual(set(self.root.tk.call("image", "names")), self.default_images)
+
+    def test_transient_effects_have_quiet_intervals(self):
+        a, c = self.view.atmosphere, self.view.canvas
+        for group in ("rain", "snow"):
+            a.configure(960, 640, sky.blend_palette(22), group, self.view._bg_pixels, 0)
+            a.update(12)
+            items = ([item for drop in a.rain_items for item in drop] if group == "rain"
+                     else a.snow_items)
+            self.assertTrue(any(c.itemcget(item, "state") == "normal" for item in items))
+            a.update(50)
+            self.assertTrue(all(c.itemcget(item, "state") == "hidden" for item in items))
+        a.configure(960, 640, sky.blend_palette(22), "clear", self.view._bg_pixels, 0)
+        a.update(12.5)
+        self.assertIsNotNone(a._meteor)
+        a.update(15)
+        self.assertIsNone(a._meteor)
+        self.assertTrue(all(c.itemcget(item, "state") == "hidden" for item in a.meteor_items))
+
+    def test_controls_scale_and_stop_drag_propagation(self):
+        calls = []
+        self.view.actions = {key: lambda key=key: calls.append(key)
+                             for key in ("settings", "full", "close")}
+        self.view.resize(1920, 1080)
+        for key, item in self.view.control_items.items():
+            x, y = self.view.canvas.coords(item)
+            event = SimpleNamespace(x=x, y=y)
+            self.assertEqual(self.view._click(event), "break")
+            self.assertEqual(self.view._control_drag(event), "break")
+            self.assertEqual(calls[-1], key)
+        self.assertIsNone(self.view._click(SimpleNamespace(x=200, y=300)))
+        self.assertIsNone(self.view._control_drag(None))
+
+    def test_text_contrast_across_all_palettes_and_weather(self):
+        minimum = 100
+        # 글자 bbox에 포함되는 모든 작은 배경 표본을 검사합니다.
+        c = self.view.canvas
+        positions = [(c.bbox(item), sky._rgb(color)) for item, color in (
+            (self.view.clock_item, wallpaper.INK), (self.view.sec_item, wallpaper.INK_3),
+            (self.view.date_item, wallpaper.INK_2), (self.view.meta_item, wallpaper.INK_3),
+            (self.view.temp_item, wallpaper.INK), (self.view.desc_item, wallpaper.INK_2),
+            (self.view.meta2_item, wallpaper.INK_3), (self.view.title_item, wallpaper.INK),
+            (self.view.artist_item, wallpaper.INK_2), (self.view.album_item, wallpaper.INK_3),
+            (self.view.play_label, wallpaper.INK_3), (self.view.phase_item, wallpaper.INK_3))]
+        for palette in sky.TIMES:
+            for group in sky.SKIES:
+                pixels = sky.render(960, 640, sky.blend_palette(palette.hour),
+                                    (255, 255, 255), group)
+                for box, ink in positions:
+                    light = luminance(ink)
+                    for y in range(max(0, box[1]), min(640, box[3]) + 1, 4):
+                        for x in range(max(0, box[0]), min(960, box[2]) + 1, 4):
+                            ground = luminance(sky.sample(pixels, x / 960, y / 640))
+                            ratio = (light + .05) / (ground + .05)
+                            minimum = min(minimum, ratio)
+                            self.assertGreaterEqual(ratio, 4.5, (palette.name, group, box, ratio))
+        print("Minimum text contrast: %.2f:1 (36 scenes, white album accent)" % minimum)
+
+
+class WallpaperIntegrationTests(unittest.TestCase):
+    def test_recording_switch_fullscreen_and_restore(self):
+        class Provider:
+            def __init__(self, *args, **kwargs):
+                self.version = 1
+                self.track = Track("Artist", "Track")
+                self.current = Weather(ok=True, temp=18, code=0, is_day=False)
+                self.levels = [0.] * 12
+                self.stopped = False
+
+            def start(self):
+                pass
+
+            def stop(self):
+                self.stopped = True
+
+        display.enable_dpi_awareness()
+        fonts.load()
+        root = tk.Tk()
+        root.withdraw()
+        root.geometry("960x640+3840+1520")
+        root.maxsize(8000, 8000)
+        root.overrideredirect(True)
+        root.tk.call("tk", "scaling", 96 / 72)
+        root.deiconify()
+        errors = []
+        root.report_callback_exception = lambda *args: errors.append(args)
+        settings = build_settings({}, parse_args([]))
+        with patch("component.app.AudioLevels", Provider), \
+                patch("component.app.NowPlaying", Provider), \
+                patch("component.app.WeatherWatch", Provider):
+            app = MonitorApp(root, settings)
+            try:
+                root.update()
+                view = app.wallpaper
+                self.assertTrue(view.running)
+                self.assertEqual(root.pack_slaves(), [view.canvas])
+                provider = app._wall_audio
+                app._set_recording(True)
+                root.update()
+                self.assertFalse(view.running)
+                self.assertTrue(provider.stopped)
+                self.assertIsNone(view._after_id)
+                self.assertEqual(root.pack_slaves(), [app.banner, app.detail,
+                                                      app.log_frame, app.status_row])
+                original_fonts = [font.cget("size") for font, _, _ in app._base_fonts]
+                app._set_recording(False)
+                self.assertTrue(view.running)
+                for rect in ((0, 0, 1920, 1080), (0, 0, 3840, 2160)):
+                    with patch("component.app.monitor_for_point", return_value=rect):
+                        view.actions["full"]()
+                        root.update()
+                        self.assertTrue(app.fullscreen)
+                        self.assertEqual((view.width, view.height), rect[2:])
+                        view.actions["full"]()
+                        root.update()
+                        self.assertFalse(app.fullscreen)
+                        self.assertEqual((view.width, view.height), (960, 640))
+                app._set_recording(True)
+                root.update()
+                self.assertEqual([font.cget("size") for font, _, _ in app._base_fonts], original_fonts)
+                app.set_view_mode("wallpaper")
+                self.assertTrue(view.running)  # 수동 선택은 녹화 상태와 독립적입니다.
+                app.hide_window()
+                self.assertFalse(view.running)
+                self.assertIsNone(view.audio)
+                self.assertTrue(app.hidden_to_tray)
+                app.show_window()
+                self.assertTrue(view.running)
+                app.set_view_mode("auto")
+                self.assertFalse(view.running)  # 현재 녹화 중이므로 감시 화면.
+                app._set_recording(False)
+                self.assertTrue(view.running)
+                app.set_view_mode("monitor")
+                app._set_recording(True)
+                app._set_recording(False)
+                self.assertFalse(view.running)  # 수동 감시 화면 선택을 지킵니다.
+                self.assertEqual(errors, [])
+            finally:
+                app.stop_wallpaper()
+                root.destroy()
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)

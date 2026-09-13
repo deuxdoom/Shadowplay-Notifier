@@ -36,6 +36,8 @@ if sys.platform.startswith("win"):
 
     _user32.FindWindowW.restype = wintypes.HWND
     _user32.FindWindowW.argtypes = [wintypes.LPCWSTR, wintypes.LPCWSTR]
+    _user32.PostMessageW.argtypes = [wintypes.HWND, wintypes.UINT,
+                                    wintypes.WPARAM, wintypes.LPARAM]
     _user32.IsIconic.argtypes = [wintypes.HWND]
     _user32.ShowWindow.argtypes = [wintypes.HWND, ctypes.c_int]
     _user32.SetForegroundWindow.argtypes = [wintypes.HWND]
@@ -87,6 +89,10 @@ def focus_existing(title):
     """
     if _user32 is None:
         return False
+    # 트레이 전용 창은 withdraw와 전체화면에도 유지됩니다.
+    tray = _user32.FindWindowW("ShadowPlayNotifier.Tray", None)
+    if tray:
+        return bool(_user32.PostMessageW(tray, 0x8002, 0, 0))
     hwnd = _user32.FindWindowW(None, title)
     if not hwnd:
         return False

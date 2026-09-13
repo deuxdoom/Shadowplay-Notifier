@@ -72,7 +72,8 @@ def main():
     watch_dir = tempfile.gettempdir()
     settings = dict(dirs=[watch_dir], outdirs=[], patterns=DEFAULT_PATTERNS,
                     interval=0.5, stall=8, min_size=1024, min_growth=1024,
-                    recursive=True, beep=False, topmost=False, borderless=True, monitor=0)
+                    recursive=True, beep=False, topmost=False, borderless=True, monitor=0,
+                    wallpaper=False)
     app = MonitorApp(root, settings)
     app.attach_close(lambda _event=None: root.destroy())
     for index in range(5):

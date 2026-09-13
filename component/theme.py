@@ -33,6 +33,13 @@ C_YELLOW = "#ffd43b"
 UI_FAMILIES = ("맑은 고딕", "Malgun Gothic", "Segoe UI", "Consolas")
 MONO_FAMILIES = ("Consolas", "D2Coding", "Courier New")
 
+# 월페이퍼 화면에만 쓰는 글꼴입니다. ``component/fonts.py`` 가 함께 묶어 온
+# 파일을 이 프로그램에서만 쓰도록 등록하며, 없으면 뒤의 것으로 넘어갑니다.
+# 녹화 화면은 맑은 고딕으로 실측해 둔 배치를 그대로 지켜야 하므로 건드리지
+# 않습니다. Pretendard JP 는 한글과 일본어를 한 벌로 담고 있습니다.
+WALL_UI_FAMILIES = ("Pretendard JP", "맑은 고딕", "Malgun Gothic", "Segoe UI")
+WALL_MONO_FAMILIES = ("JetBrains Mono", "Consolas", "D2Coding", "Courier New")
+
 
 def pick_font(root, families, size, weight="normal"):
     """설치된 글꼴 중 앞에 있는 것을 씁니다. 없으면 마지막 것으로 넘어갑니다."""
