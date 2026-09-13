@@ -27,7 +27,11 @@ function Save-Shot([string]$name) {
     Write-Host "캡처: $path"
 }
 
-$temp = Join-Path $env:TEMP ("spn_live_" + [guid]::NewGuid().ToString("N").Substring(0, 6))
+$tempBase = [IO.Path]::GetFullPath($env:TEMP).TrimEnd('\') + '\'
+$temp = [IO.Path]::GetFullPath((Join-Path $env:TEMP ("spn_live_" + [guid]::NewGuid().ToString("N"))))
+if (-not $temp.StartsWith($tempBase, [StringComparison]::OrdinalIgnoreCase)) {
+    throw "임시 폴더가 TEMP를 벗어났습니다: $temp"
+}
 $game = Join-Path $temp "OnimushaWotS"
 New-Item -ItemType Directory -Path $game -Force | Out-Null
 $file = Join-Path $game "Onimusha 2026.09.07 - 12.00.00.04.DVR.tmp"
@@ -40,7 +44,7 @@ $arguments = @(
 )
 $proc = Start-Process pythonw -PassThru -ArgumentList $arguments
 Start-Sleep -Seconds 3
-Save-Shot "1_idle"
+Save-Shot "1_wallpaper"
 
 # 2MB 씩 키워서 실제 녹화와 비슷하게 파일을 늘립니다.
 $chunk = New-Object byte[] (2 * 1024 * 1024)
@@ -57,10 +61,14 @@ Write-Host ("파일 증가 시작 시각: {0:HH:mm:ss.fff}" -f $began)
 Write-Host ("파일 증가 종료 시각: {0:HH:mm:ss.fff}" -f (Get-Date))
 
 Start-Sleep -Seconds ($Stall + 3)
-Save-Shot "3_back_to_idle"
+Save-Shot "3_back_to_wallpaper"
 
 Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
-Remove-Item $temp -Recurse -Force -ErrorAction SilentlyContinue
+$tempLeaf = Split-Path -Leaf $temp
+if ($tempLeaf.StartsWith("spn_live_", [StringComparison]::OrdinalIgnoreCase) -and
+    (Test-Path -LiteralPath $temp)) {
+    Remove-Item -LiteralPath $temp -Recurse -Force
+}
 
 Write-Host "`n--- monitor.log 마지막 12줄 ---"
 Get-Content (Join-Path $root "monitor.log") -Tail 12

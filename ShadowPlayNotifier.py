@@ -84,7 +84,7 @@ def main(argv=None):
         if tray is not None:
             tray.close()
         app.stop_event.set()
-        supervisor.stop()
+        supervisor.stop(1.0)
         app.stop_wallpaper()
         try:
             root.destroy()
@@ -97,23 +97,16 @@ def main(argv=None):
         else:
             close()
 
-    def select_view(mode):
-        app.set_view_mode(mode)
-        app.show_window()
-
     def settings_from_tray():
         app.show_window()
         app.open_settings()
 
     tray = TrayIcon(root, {
         "show": app.show_window,
-        "wallpaper": lambda: select_view("wallpaper"),
-        "monitor": lambda: select_view("monitor"),
-        "auto": lambda: select_view("auto"),
         "settings": settings_from_tray,
         "github": lambda: webbrowser.open("https://github.com/deuxdoom/Shadowplay-Notifier"),
         "quit": close,
-    }, lambda: {"mode": app.view_mode, "recording": app.recording})
+    }, lambda: {"recording": app.recording})
     root.protocol("WM_DELETE_WINDOW", hide)
     app.attach_close(hide)
     root.bind("<Control-q>", close)
@@ -136,7 +129,7 @@ def main(argv=None):
     finally:
         tray.close()
         app.stop_event.set()
-        supervisor.stop()
+        supervisor.stop(1.0)
         app.stop_wallpaper()
         fonts.unload()
         log("앱 종료")

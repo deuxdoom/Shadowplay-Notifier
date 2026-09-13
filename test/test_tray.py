@@ -18,7 +18,7 @@ class TrayTests(unittest.TestCase):
         self.root = tk.Tk()
         self.root.withdraw()
         self.calls = []
-        self.state = {"mode": "auto", "recording": False}
+        self.state = {"recording": False}
         self.tray = TrayIcon(self.root, {
             action: lambda action=action: self.calls.append(action)
             for action in TrayIcon.COMMANDS.values()}, lambda: self.state)
@@ -47,10 +47,8 @@ class TrayTests(unittest.TestCase):
             with patch.object(user32, "TrackPopupMenu", return_value=command):
                 self.tray._show_menu()
             self.assertEqual(self.calls[-1], action)
-        for mode, command in (("wallpaper", 2), ("monitor", 3), ("auto", 4)):
-            self.state["mode"] = mode
-            checked = [item[0] for item in self.tray.menu_entries() if item[2] == 8]
-            self.assertEqual(checked, [command])
+        commands = [item[0] for item in self.tray.menu_entries() if item[0]]
+        self.assertEqual(commands, [1, 5, 6, 7])
 
     def test_explorer_restart_readds_icon(self):
         shell32.Shell_NotifyIconW(2, ctypes.byref(self.tray._data))

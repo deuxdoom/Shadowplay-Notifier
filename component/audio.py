@@ -40,6 +40,9 @@ AUDCLNT_SHAREMODE_SHARED = 0
 AUDCLNT_STREAMFLAGS_LOOPBACK = 0x00020000
 AUDCLNT_BUFFERFLAGS_SILENT = 0x2
 BUFFER_100NS = 2000000  # 0.2 초
+WAVE_FORMAT_PCM = 0x0001
+WAVE_FORMAT_IEEE_FLOAT = 0x0003
+WAVE_FORMAT_EXTENSIBLE = 0xFFFE
 
 
 class GUID(ctypes.Structure):
@@ -53,11 +56,24 @@ class GUID(ctypes.Structure):
 
 
 class WAVEFORMATEX(ctypes.Structure):
+    _pack_ = 1
     _fields_ = [("wFormatTag", ctypes.c_uint16), ("nChannels", ctypes.c_uint16),
                 ("nSamplesPerSec", ctypes.c_uint32),
                 ("nAvgBytesPerSec", ctypes.c_uint32),
                 ("nBlockAlign", ctypes.c_uint16), ("wBitsPerSample", ctypes.c_uint16),
                 ("cbSize", ctypes.c_uint16)]
+
+
+class WAVEFORMATEXTENSIBLE(ctypes.Structure):
+    _pack_ = 1
+    _fields_ = [("Format", WAVEFORMATEX), ("Samples", ctypes.c_uint16),
+                ("dwChannelMask", ctypes.c_uint32), ("SubFormat", GUID)]
+
+
+ole32.CoTaskMemFree.argtypes = [c_void_p]
+ole32.CoTaskMemFree.restype = None
+ole32.CoUninitialize.argtypes = []
+ole32.CoUninitialize.restype = None
 
 
 def _vcall(ptr, index, argtypes, *args):
@@ -70,6 +86,22 @@ def _vcall(ptr, index, argtypes, *args):
 def _release(ptr):
     if ptr:
         _vcall(ptr, 2, [])  # IUnknown::Release
+
+
+def _sample_kind(fmt_ptr):
+    """공유 모드 장치 형식을 실제로 해석할 수 있을 때만 돌려줍니다."""
+    fmt = fmt_ptr.contents
+    tag = fmt.wFormatTag
+    if tag == WAVE_FORMAT_EXTENSIBLE:
+        if fmt.cbSize < 22:
+            raise OSError("잘못된 WAVEFORMATEXTENSIBLE 형식입니다")
+        tag = ctypes.cast(fmt_ptr, POINTER(WAVEFORMATEXTENSIBLE)).contents.SubFormat.Data1
+    if tag == WAVE_FORMAT_IEEE_FLOAT and fmt.wBitsPerSample == 32:
+        return "float32"
+    if tag == WAVE_FORMAT_PCM and fmt.wBitsPerSample == 16:
+        return "pcm16"
+    raise OSError("지원하지 않는 오디오 형식입니다 (tag=%d, %d bit)"
+                  % (tag, fmt.wBitsPerSample))
 
 
 # FFT 에 쓰는 회전 인자와 창 함수는 한 번만 만들어 둡니다.
@@ -162,72 +194,105 @@ class AudioLevels(threading.Thread):
             _release(enumerator)
             raise OSError("오디오 클라이언트를 열지 못했습니다 (0x%08x)" % (hr & 0xFFFFFFFF))
 
-        fmt_ptr = POINTER(WAVEFORMATEX)()
-        _vcall(client, 8, [POINTER(POINTER(WAVEFORMATEX))], byref(fmt_ptr))
-        fmt = fmt_ptr.contents
-        hr = _vcall(client, 3, [c_uint32, c_uint32, c_uint64, c_uint64,
-                                POINTER(WAVEFORMATEX), c_void_p],
-                    AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_LOOPBACK,
-                    BUFFER_100NS, 0, fmt_ptr, None)
-        if hr:
-            _release(client)
-            _release(device)
-            _release(enumerator)
-            raise OSError("루프백 캡처를 시작하지 못했습니다 (0x%08x)" % (hr & 0xFFFFFFFF))
         capture = c_void_p()
-        _vcall(client, 14, [POINTER(GUID), POINTER(c_void_p)],
-               byref(GUID(IID_IAudioCaptureClient)), byref(capture))
-        _vcall(client, 10, [])  # Start
-        return enumerator, device, client, capture, fmt
-
-    # ------------------------------------------------------------ 본체
-
-    def run(self):
-        ole32.CoInitializeEx(None, 0)
+        fmt_ptr = POINTER(WAVEFORMATEX)()
         try:
-            enumerator, device, client, capture, fmt = self._open()
-        except Exception as exc:
-            self.error = str(exc)
-            log("[소리] 시각화를 켜지 못했습니다: %s" % exc)
-            return
-        self.available = True
-        rate = fmt.nSamplesPerSec
-        channels = fmt.nChannels
-        block = fmt.nBlockAlign
-        _, edges, centers = band_edges(rate)
-        tilt = [TILT_DB * math.log2(c / 200.0) for c in centers]
-        detail("[소리] 시각화를 시작합니다 (%d Hz, %d 채널)" % (rate, channels))
-
-        buf = []
-        data_ptr, frames, flags = c_void_p(), c_uint32(), c_uint32()
-        pos, qpc = c_uint64(), c_uint64()
-        period = 1.0 / self.fps
-        next_at = time.perf_counter()
-
-        try:
-            while not self.stop_event.is_set():
-                self._drain(capture, buf, channels, block,
-                            data_ptr, frames, flags, pos, qpc)
-                now = time.perf_counter()
-                if now >= next_at and len(buf) >= N_FFT:
-                    next_at = now + period
-                    self._analyze(buf[-N_FFT:], edges, tilt)
-                self.stop_event.wait(0.004)
-        except Exception as exc:
-            self.error = str(exc)
-            log("[소리] 시각화가 멈췄습니다: %s" % exc)
-        finally:
+            hr = _vcall(client, 8, [POINTER(POINTER(WAVEFORMATEX))], byref(fmt_ptr))
+            if hr < 0 or not fmt_ptr:
+                raise OSError("출력 장치 형식을 얻지 못했습니다 (0x%08x)"
+                              % (hr & 0xFFFFFFFF))
+            fmt = fmt_ptr.contents
+            rate, channels, block = fmt.nSamplesPerSec, fmt.nChannels, fmt.nBlockAlign
+            sample_kind = _sample_kind(fmt_ptr)
+            bytes_per_sample = 4 if sample_kind == "float32" else 2
+            if not channels or block < channels * bytes_per_sample:
+                raise OSError("출력 장치의 블록 크기가 올바르지 않습니다")
             try:
-                _vcall(client, 11, [])  # Stop
-            except Exception:
-                pass
+                hr = _vcall(client, 3, [c_uint32, c_uint32, c_uint64, c_uint64,
+                                        POINTER(WAVEFORMATEX), c_void_p],
+                            AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_LOOPBACK,
+                            BUFFER_100NS, 0, fmt_ptr, None)
+            finally:
+                # GetMixFormat의 버퍼 소유권은 호출자에게 있습니다.
+                ole32.CoTaskMemFree(ctypes.cast(fmt_ptr, c_void_p))
+                fmt_ptr = POINTER(WAVEFORMATEX)()
+            if hr < 0:
+                raise OSError("루프백 캡처를 초기화하지 못했습니다 (0x%08x)"
+                              % (hr & 0xFFFFFFFF))
+            hr = _vcall(client, 14, [POINTER(GUID), POINTER(c_void_p)],
+                        byref(GUID(IID_IAudioCaptureClient)), byref(capture))
+            if hr < 0 or not capture:
+                raise OSError("오디오 캡처 서비스를 얻지 못했습니다 (0x%08x)"
+                              % (hr & 0xFFFFFFFF))
+            hr = _vcall(client, 10, [])  # Start
+            if hr < 0:
+                raise OSError("루프백 캡처를 시작하지 못했습니다 (0x%08x)"
+                              % (hr & 0xFFFFFFFF))
+            return (enumerator, device, client, capture, rate, channels, block,
+                    sample_kind)
+        except Exception:
+            if fmt_ptr:
+                ole32.CoTaskMemFree(ctypes.cast(fmt_ptr, c_void_p))
             _release(capture)
             _release(client)
             _release(device)
             _release(enumerator)
-            self.available = False
+            raise
 
-    def _drain(self, capture, buf, channels, block,
+    # ------------------------------------------------------------ 본체
+
+    def run(self):
+        hr = ole32.CoInitializeEx(None, 0)
+        if hr < 0:
+            self.error = "COM 초기화 실패 (0x%08x)" % (hr & 0xFFFFFFFF)
+            log("[소리] 시각화를 켜지 못했습니다: %s" % self.error)
+            return
+        try:
+            try:
+                (enumerator, device, client, capture, rate, channels, block,
+                 sample_kind) = self._open()
+            except Exception as exc:
+                self.error = str(exc)
+                log("[소리] 시각화를 켜지 못했습니다: %s" % exc)
+                return
+            self.available = True
+            _, edges, centers = band_edges(rate)
+            tilt = [TILT_DB * math.log2(c / 200.0) for c in centers]
+            detail("[소리] 시각화를 시작합니다 (%d Hz, %d 채널, %s)"
+                   % (rate, channels, sample_kind))
+
+            buf = []
+            data_ptr, frames, flags = c_void_p(), c_uint32(), c_uint32()
+            pos, qpc = c_uint64(), c_uint64()
+            period = 1.0 / self.fps
+            next_at = time.perf_counter()
+
+            try:
+                while not self.stop_event.is_set():
+                    self._drain(capture, buf, channels, block, sample_kind,
+                                data_ptr, frames, flags, pos, qpc)
+                    now = time.perf_counter()
+                    if now >= next_at and len(buf) >= N_FFT:
+                        next_at = now + period
+                        self._analyze(buf[-N_FFT:], edges, tilt)
+                    self.stop_event.wait(0.004)
+            except Exception as exc:
+                self.error = str(exc)
+                log("[소리] 시각화가 멈췄습니다: %s" % exc)
+            finally:
+                try:
+                    _vcall(client, 11, [])  # Stop
+                except Exception:
+                    pass
+                _release(capture)
+                _release(client)
+                _release(device)
+                _release(enumerator)
+                self.available = False
+        finally:
+            ole32.CoUninitialize()
+
+    def _drain(self, capture, buf, channels, block, sample_kind,
                data_ptr, frames, flags, pos, qpc):
         """쌓인 패킷을 모두 꺼내 한 채널로 합칩니다."""
         while True:
@@ -242,8 +307,16 @@ class AudioLevels(threading.Thread):
             if flags.value & AUDCLNT_BUFFERFLAGS_SILENT:
                 buf.extend([0.0] * count)
             else:
-                vals = struct.unpack("<%df" % (count * channels),
-                                     ctypes.string_at(data_ptr, count * block))
+                raw = ctypes.string_at(data_ptr, count * block)
+                code, width = ("f", 4) if sample_kind == "float32" else ("h", 2)
+                if block == channels * width:
+                    vals = struct.unpack("<%d%s" % (count * channels, code), raw)
+                else:
+                    vals = tuple(struct.unpack_from("<" + code, raw,
+                                                    frame * block + channel * width)[0]
+                                 for frame in range(count) for channel in range(channels))
+                if sample_kind == "pcm16":
+                    vals = tuple(value / 32768.0 for value in vals)
                 if channels >= 2:
                     buf.extend((vals[i] + vals[i + 1]) * 0.5
                                for i in range(0, len(vals), channels))

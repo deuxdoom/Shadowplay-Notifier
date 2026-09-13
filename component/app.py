@@ -61,7 +61,6 @@ class MonitorApp:
         self.borderless = settings["borderless"]
 
         self.close_callback = None
-        self.view_mode = "auto" if settings.get("wallpaper", True) else "monitor"
         self.hidden_to_tray = False
         self.settings_callback = None
         self.fullscreen = False
@@ -78,29 +77,29 @@ class MonitorApp:
         self.last_update = "--:--:--"
         self.warning = ""
         self.log_rows = deque(maxlen=LOG_ROWS)
+        self._folder_text = ""
         self._layout_size = None
         self._scale_x = self._scale_y = 1.0
         self._cell_holders = []
 
-        # 아래 구성 과정에서 _show_idle 이 먼저 불리므로 자리를 미리 비워 둡니다.
+        # 예전 위젯 화면을 구성하는 동안 자리를 미리 비워 둡니다.
         self.wallpaper = None
         self._wall_audio = self._wall_track = self._wall_weather = None
+        self._retired_sources = []
 
         self._init_fonts()
         self._build_banner()
         self._build_detail()
         self._build_log()
         self._build_status()
-        self._show_idle()
         self._refresh_status()
         self._enable_drag()
         self.root.bind("<Configure>", self._resize_layout, add="+")
 
         # 월페이퍼 화면을 켭니다. 녹화가 잡히면 같은 캔버스에서 내용만 바뀝니다.
         # _sync_view 가 화면을 켜고 소리·음악·날씨 스레드까지 함께 시작합니다.
-        if self.settings.get("wallpaper", True):
-            self._ensure_wallpaper()
-            self._sync_view()
+        self._ensure_wallpaper()
+        self._sync_view()
 
         self.root.after(50, self._pulse)
         self.root.after(100, self._drain)
@@ -471,10 +470,8 @@ class MonitorApp:
         self._refresh_status()
         if self.settings_callback:
             self.settings_callback(settings)
-        if settings.get("wallpaper", True) != previous.get("wallpaper", True):
-            self.set_view_mode("auto" if settings.get("wallpaper", True) else "monitor")
-        elif any(settings.get(key) != previous.get(key) for key in
-                 ("latitude", "longitude", "wallpaper_fps")):
+        if any(settings.get(key) != previous.get(key) for key in
+               ("latitude", "longitude", "wallpaper_fps")):
             self._leave_wallpaper()
             self._sync_view()
 
@@ -500,39 +497,25 @@ class MonitorApp:
                          "full": self.toggle_fullscreen,
                          "close": lambda: self.close_callback() if self.close_callback else None})
 
-    def set_view_mode(self, mode):
-        if mode not in ("auto", "wallpaper", "monitor"):
-            raise ValueError("Unknown view mode: " + str(mode))
-        self.view_mode = mode
-        self._sync_view()
-
     def _sync_view(self):
         """지금 보여야 할 화면을 정합니다.
 
-        월페이퍼를 쓰는 동안에는 캔버스 하나가 세 화면을 모두 맡습니다.
+        월페이퍼를 쓰는 동안에는 캔버스 하나가 두 화면을 모두 맡습니다.
         배경을 그대로 둔 채 내용만 갈아 끼우므로 전환이 이어져 보입니다.
         """
         if self.hidden_to_tray:
             return
-        if not self.settings.get("wallpaper", True):
-            self._leave_wallpaper()
-            return
         self._ensure_wallpaper()
-        if self.view_mode == "wallpaper" or (self.view_mode == "auto"
-                                             and not self.recording):
-            mode = "wall"
-        else:
-            mode = "rec" if self.recording else "idle"
+        mode = "rec" if self.recording else "wall"
         self._enter_wallpaper()
         self._sync_sources(mode == "wall")
         self.wallpaper.set_mode(mode)
-        if mode != "wall":
+        if mode == "rec":
             self._refresh_wall_status()
-            if mode == "idle":
-                self._show_idle()
 
     def _sync_sources(self, want):
         """소리와 음악, 날씨 스레드는 월페이퍼 화면에서만 돌립니다."""
+        self._reap_sources()
         if want and self._wall_audio is None:
             self._wall_audio = AudioLevels(
                 fps=self.settings.get("wallpaper_fps", 30))
@@ -546,14 +529,35 @@ class MonitorApp:
             self.wallpaper.set_sources(self._wall_audio, self._wall_track,
                                        self._wall_weather)
         elif not want and self._wall_audio is not None:
-            for thread in (self._wall_audio, self._wall_track, self._wall_weather):
-                if thread is not None:
-                    thread.stop()
-            self._wall_audio = self._wall_track = self._wall_weather = None
+            self._stop_sources()
+
+    def _reap_sources(self):
+        """종료 신호 뒤 정리 중인 공급자만 잠시 참조합니다."""
+        self._retired_sources = [thread for thread in self._retired_sources
+                                 if getattr(thread, "is_alive", lambda: False)()]
+
+    def _stop_sources(self, wait=0.0):
+        threads = tuple(thread for thread in
+                        (self._wall_audio, self._wall_track, self._wall_weather)
+                        if thread is not None)
+        for thread in threads:
+            thread.stop()
+        if wait:
+            deadline = time.monotonic() + wait
+            for thread in threads:
+                join = getattr(thread, "join", None)
+                if join and getattr(thread, "is_alive", lambda: False)():
+                    join(max(0.0, deadline - time.monotonic()))
+        self._retired_sources.extend(
+            thread for thread in threads
+            if getattr(thread, "is_alive", lambda: False)())
+        self._wall_audio = self._wall_track = self._wall_weather = None
+        if self.wallpaper is not None:
             self.wallpaper.set_sources(None, None, None)
+        self._reap_sources()
 
     def _refresh_wall_status(self):
-        """녹화·대기 화면 맨 아래 줄입니다."""
+        """녹화 화면 맨 아래 줄입니다."""
         if self.wallpaper is None:
             return
         shown = _short_path(self.dirs[0]) if self.dirs else "(감시 폴더 없음)"
@@ -576,7 +580,7 @@ class MonitorApp:
         self.root.focus_force()
 
     def _enter_wallpaper(self):
-        """캔버스 화면을 켭니다. 세 화면 모두 이 캔버스에 그립니다."""
+        """캔버스 화면을 켭니다. 월페이퍼와 녹화 화면을 여기에 그립니다."""
         if self.hidden_to_tray or self.wallpaper is None or self.wallpaper.running:
             return
         for widget in (self.banner, self.detail, self.log_frame, self.status_row):
@@ -606,8 +610,11 @@ class MonitorApp:
     def stop_wallpaper(self):
         """창을 닫을 때 부릅니다."""
         if self.wallpaper is None:
+            self._stop_sources(.5)
             return
-        self._leave_wallpaper()
+        if self.wallpaper.running:
+            self._leave_wallpaper()
+        self._stop_sources(.5)
         self.wallpaper.destroy()
         self.wallpaper = None
 
@@ -624,7 +631,6 @@ class MonitorApp:
             self.banner.itemconfigure(self.banner_text, text="대기중",
                                       fill=C_DIM)
             self.banner.itemconfigure(self.banner_sub, text="", fill=C_DIM)
-            self._show_idle()
         self._sync_view()
 
     def _show_folder(self, text, color):
@@ -637,22 +643,9 @@ class MonitorApp:
                 break
         self.v_folder.config(text=ellipsize(text, 30), font=chosen, fg=color)
 
-    def _show_idle(self):
-        self._fill_idle_wallpaper()
-        self._show_folder("대기 중", C_MUTED)
-        self.v_file.config(text="—", fg=C_MUTED)
-        self.v_elapsed.config(text="—", fg=C_MUTED)
-        self.v_size.config(text="—", fg=C_MUTED)
-        self.v_rate.config(text="—", fg=C_MUTED)
-        self.v_growth.config(text="—", fg=C_MUTED)
-        self.v_summary.config(
-            text="%s   |   세션 누적 %d회" % (self.last_summary,
-                                              self.session_count))
-
     def _apply_state(self, event):
         self._set_recording(bool(event.get("active")))
         if not event.get("active"):
-            self._show_idle()
             return
         path = event["path"]
         self._show_folder(folder_label(path, self.dirs), C_FG)
@@ -675,23 +668,6 @@ class MonitorApp:
                 "%.1f Mbps" % mbps if mbps else "측정 중",
                 "%.1f초 전 증가" % since, os.path.basename(path))
             self._refresh_wall_status()
-
-    def _fill_idle_wallpaper(self):
-        """녹화를 기다리는 화면에 직전 녹화 기록을 적습니다."""
-        if self.wallpaper is None or self.wallpaper.mode != "idle":
-            return
-        record = self.last_record
-        if record:
-            size = human(record["peak"])
-            note = "직전 녹화 %s" % hms(record["dur"])
-            detail = "오늘 %d회 · %s 에 끝남" % (self.session_count, record["at"])
-            name = record["name"]
-        else:
-            size, note, detail, name = "— ", "녹화 기록이 없습니다", "", ""
-        self.wallpaper.show_idle(
-            self.dirs[0] if self.dirs else "감시 폴더 없음",
-            size, note, detail, name)
-        self._refresh_wall_status()
 
     def add_log(self, text, color, kind="", detail=""):
         stamp = time.strftime("%H:%M:%S")
@@ -739,7 +715,6 @@ class MonitorApp:
                                 "peak": event["peak"],
                                 "at": time.strftime("%H:%M")}
             self._set_recording(False)
-            self._show_idle()
         elif kind == "health":
             missing = event.get("missing") or []
             self.warning = ("폴더에 접근할 수 없습니다: "

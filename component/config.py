@@ -25,9 +25,6 @@ DEFAULT_CONFIG = {
     "topmost": False,
     "borderless": True,
     "monitor": -1,
-    # 녹화를 기다리는 동안 시계와 날씨, 재생 중인 곡을 보여 줍니다.
-    # 끄면 예전처럼 대기 화면만 나옵니다.
-    "wallpaper": True,
     # 날씨를 볼 곳입니다. 기본값은 서울입니다.
     "latitude": 37.5665,
     "longitude": 126.9780,
@@ -130,9 +127,6 @@ def parse_args(argv):
     ap.add_argument("--borderless", dest="borderless", action="store_true",
                     default=None)
     ap.add_argument("--no-borderless", dest="borderless", action="store_false")
-    ap.add_argument("--wallpaper", dest="wallpaper", action="store_true",
-                    default=None)
-    ap.add_argument("--no-wallpaper", dest="wallpaper", action="store_false")
     try:
         return ap.parse_args(argv)
     except SystemExit:
@@ -167,7 +161,6 @@ def build_settings(cfg, args):
         "topmost": bool(pick(args.topmost, "topmost", False)),
         "borderless": bool(pick(args.borderless, "borderless", True)),
         "monitor": int(pick(args.monitor, "monitor", -1)),
-        "wallpaper": bool(pick(args.wallpaper, "wallpaper", True)),
         "latitude": float(cfg.get("latitude", 37.5665) or 37.5665),
         "longitude": float(cfg.get("longitude", 126.9780) or 126.9780),
         # monitor.log 에 자세한 기록까지 남길지 정합니다. 문제를 찾을 때만 켭니다.
@@ -192,7 +185,6 @@ def settings_to_config(settings):
         "topmost": settings["topmost"],
         "borderless": settings["borderless"],
         "monitor": settings["monitor"],
-        "wallpaper": settings["wallpaper"],
         "latitude": settings["latitude"],
         "longitude": settings["longitude"],
     }

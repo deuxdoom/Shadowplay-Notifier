@@ -1,6 +1,7 @@
 # 오프라인 미리보기를 보조 화면에서 캡처합니다. 본 앱을 먼저 닫으십시오.
 param(
     [int]$Scene = 0,
+    [string]$Season = 'autumn',
     [string]$Size = '960x640',
     [double]$After = 4,
     [switch]$Empty,
@@ -24,6 +25,7 @@ if ($wallWidth -gt 960 -or $wallHeight -gt 640) {
 $wallArguments = '"{0}" --scene {1} --size {2} --seconds {3}' -f (
     (Join-Path $PSScriptRoot 'wallpaper_preview.py'), $Scene, $Size, ($After + 3))
 if ($Empty) { $wallArguments += ' --empty' }
+$wallArguments += ' --season ' + $Season
 if ($Controls) { $wallArguments += ' --controls' }
 $wallProcess = Start-Process pythonw -ArgumentList $wallArguments -WorkingDirectory $wallRoot -WindowStyle Hidden -PassThru
 try {
@@ -33,7 +35,7 @@ try {
     try {
         $wallGraphics.CopyFromScreen($wallX,$wallY,0,0,$wallBitmap.Size)
         $suffix = if ($Empty) { '_empty' } elseif ($Controls) { '_controls' } else { '' }
-        $wallOutput = Join-Path $PSScriptRoot ('shot_wallpaper_{0}_{1}{2}.png' -f $Scene,$Size,$suffix)
+        $wallOutput = Join-Path $PSScriptRoot ('shot_wallpaper_{0}_{1}_{2}{3}.png' -f $Season,$Scene,$Size,$suffix)
         $wallBitmap.Save($wallOutput,[System.Drawing.Imaging.ImageFormat]::Png)
         Write-Output $wallOutput
     } finally {

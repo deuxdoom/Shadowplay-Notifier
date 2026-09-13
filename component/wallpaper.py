@@ -22,9 +22,12 @@ WICON_SIZE = 128
 SPECTRUM_BARS = 64
 # 보조 정보 왼쪽에 놓는 달의 지름입니다.
 MOON_SIZE = 70
-INK, INK_2, INK_3 = "#f1f2f3", "#bdc5ce", "#b2bdcb"
+INK, INK_2, INK_3 = "#f1f2f3", "#bdc5ce", "#c6d0dc"
+RAINBOW = tuple(sky._rgb(c) for c in (
+    "#ff6f91", "#ffae68", "#ffe78b", "#a4ed9b", "#63dfd7",
+    "#6dbdfc", "#a99aff", "#e28fdf"))
 
-# 녹화·대기 화면. 월페이퍼와 같은 골격을 쓰되 내용만 갈아 끼웁니다.
+# 녹화 화면. 월페이퍼와 같은 골격을 쓰되 내용만 갈아 끼웁니다.
 # 큰 숫자는 시계와 같은 높이에 두어 전환이 이어져 보이게 합니다.
 REC_LABEL_Y, REC_FOLDER_Y, REC_BIG_Y = 58, 116, 248
 REC_RATE_Y, REC_GROW_Y, REC_FILE_Y = 318, 358, 392
@@ -34,7 +37,6 @@ STATUS_Y = 602
 REC_RED, REC_RED_LIT = "#ff4d4d", "#ff9090"
 REC_TIME_INK = "#ff6b6b"
 REC_BADGE_BG, REC_BADGE_EDGE = "#bf2a2a", "#ff9b9b"
-IDLE_INK, IDLE_BADGE_BG, IDLE_BADGE_EDGE = "#7e8aa2", "#222b38", "#3d4858"
 LOG_TIME_INK, STATUS_INK = "#8a94a6", "#77839a"
 LOG_START_INK, LOG_STOP_INK = "#ff8080", "#7cc4f7"
 CLOCK_FAMILIES = ("Segoe UI Light", "Segoe UI", "Pretendard JP", "Arial")
@@ -104,6 +106,8 @@ class WallpaperView:
         c = self.canvas
         self.bg_item = c.create_image(0, 0, anchor="nw")
         self.atmosphere = Atmosphere(c)
+        self.bar_glows = [c.create_line(0, 0, 0, 0, capstyle="round", fill=INK_3)
+                          for _ in range(SPECTRUM_BARS)]
         self.bar_items = [c.create_line(0, 0, 0, 0, capstyle="round", fill=INK_3)
                           for _ in range(SPECTRUM_BARS)]
         self.reflection_items = [c.create_line(0, 0, 0, 0, capstyle="round", fill=INK_3)
@@ -159,7 +163,7 @@ class WallpaperView:
         self._pressed_control = False
 
     def _build_recording(self):
-        """녹화와 대기 화면에 쓰는 도형입니다. 만들어 두고 숨겨 놓습니다."""
+        """녹화 화면에 쓰는 도형입니다. 만들어 두고 숨겨 놓습니다."""
         c = self.canvas
         self.rec_dot = c.create_oval(0, 0, 0, 0, outline="", fill=REC_RED,
                                      tags="reconly")
@@ -209,7 +213,7 @@ class WallpaperView:
                      self.record_center, self.cover_item, self.play_label,
                      self.title_item, self.title_shadow, self.album_item):
             c.addtag_withtag("wallonly", item)
-        for group in (self.bar_items, self.reflection_items, self.record_items,
+        for group in (self.bar_items, self.bar_glows, self.reflection_items, self.record_items,
                       self.play_dots, self.weather_sparks):
             for item in group:
                 c.addtag_withtag("wallonly", item)
@@ -224,7 +228,11 @@ class WallpaperView:
         self._track_x = x + (COVER_SIZE + 30) * s
         self._track_width = max(1, right - self._track_x)
         self._bar_left, self._bar_right = x, right
-        self._bar_y, self._bar_height = 449 * sy, 27 * s
+        self._bar_y, self._bar_height = 453 * sy, 72 * s
+        for group, width in ((self.bar_items, 4), (self.bar_glows, 8),
+                             (self.reflection_items, 3)):
+            for item in group:
+                c.itemconfigure(item, width=max(1, width * s))
         # 구분선을 빼고 사이 간격만으로 나눕니다. 선이 차지하던 자리를
         # 시계가 가져갑니다.
         c.coords(self.phase_item, x, 52 * sy)
@@ -236,8 +244,8 @@ class WallpaperView:
         c.coords(self.wicon_item, *self._weather_center)
         c.coords(self.temp_item, right, 206 * sy)
         c.coords(self.desc_item, right, 288 * sy)
-        c.coords(self.meta_item, right, 344 * sy)
-        c.coords(self.meta2_item, right, 388 * sy)
+        c.coords(self.meta_item, right, 326 * sy)
+        c.coords(self.meta2_item, right, 358 * sy)
         cx, cy = self._cover_xy
         side = COVER_SIZE * s
         c.coords(self.cover_mat, *_round_rect(cx, cy, side, side, 15 * s))
@@ -261,7 +269,7 @@ class WallpaperView:
         self._position_seconds()
 
     def _place_recording(self):
-        """녹화·대기 화면의 자리입니다. 월페이퍼와 같은 여백을 씁니다."""
+        """녹화 화면의 자리입니다. 월페이퍼와 같은 여백을 씁니다."""
         c, sx, sy, s = self.canvas, self.scale_x, self.scale_y, self.scale
         x, right = 60 * sx, self.width - 60 * sx
         radius = 11 * s
@@ -312,12 +320,12 @@ class WallpaperView:
         return self._mode
 
     def set_mode(self, mode):
-        """``wall``, ``rec``, ``idle`` 가운데 하나로 바꿉니다.
+        """``wall``과 ``rec`` 가운데 하나로 바꿉니다.
 
         배경과 지평선은 그대로 두고 그 위의 내용만 갈아 끼웁니다. 캔버스를
         떠나지 않으므로 하늘을 다시 굽지 않고 전환이 이어집니다.
         """
-        if mode not in ("wall", "rec", "idle") or mode == self._mode:
+        if mode not in ("wall", "rec") or mode == self._mode:
             return
         self._mode = mode
         c = self.canvas
@@ -332,25 +340,21 @@ class WallpaperView:
                                           self._sky_key, self._bg_pixels,
                                           time.perf_counter())
         else:
-            self._paint_mode(mode)
+            self._paint_recording()
+        self._paint_foreground()
+        self._bake_sky()
 
-    def _paint_mode(self, mode):
-        """녹화와 대기의 색을 나누어 칠합니다."""
+    def _paint_recording(self):
+        """녹화 화면의 고대비 색과 문구를 칠합니다."""
         c = self.canvas
-        recording = (mode == "rec")
-        c.itemconfigure(self.rec_word,
-                        text="R E C O R D I N G" if recording else "S T A N D B Y",
-                        fill=REC_RED if recording else IDLE_INK)
-        c.itemconfigure(self.rec_dot, fill=REC_RED if recording else IDLE_INK)
-        c.itemconfigure(self.rec_time, fill=REC_TIME_INK if recording else IDLE_INK)
-        c.itemconfigure(self.badge_mat,
-                        fill=REC_BADGE_BG if recording else IDLE_BADGE_BG,
-                        outline=REC_BADGE_EDGE if recording else IDLE_BADGE_EDGE)
-        c.itemconfigure(self.badge_ring, fill="#ffffff" if recording else "#59647a")
-        c.itemconfigure(self.badge_word, text="R E C" if recording else "I D L E",
-                        fill="#ffffff" if recording else IDLE_INK)
-        c.itemconfigure(self.rec_size, fill=INK if recording else "#8b97a9")
-        c.itemconfigure(self.rec_rate, fill=INK_2 if recording else "#79839a")
+        c.itemconfigure(self.rec_word, text="R E C O R D I N G", fill=REC_RED)
+        c.itemconfigure(self.rec_dot, fill=REC_RED)
+        c.itemconfigure(self.rec_time, fill=REC_TIME_INK)
+        c.itemconfigure(self.badge_mat, fill=REC_BADGE_BG, outline=REC_BADGE_EDGE)
+        c.itemconfigure(self.badge_ring, fill="#ffffff")
+        c.itemconfigure(self.badge_word, text="R E C", fill="#ffffff")
+        c.itemconfigure(self.rec_size, fill=INK)
+        c.itemconfigure(self.rec_rate, fill=INK_2)
 
     def show_recording(self, folder, elapsed, size, rate, growth, filename):
         """녹화 중일 때 채웁니다. 값은 이미 다듬은 문자열입니다."""
@@ -366,24 +370,6 @@ class WallpaperView:
         self._place_size_value()
         c.itemconfigure(self.rec_rate, text=rate)
         c.itemconfigure(self.rec_grow, text=growth)
-        c.itemconfigure(self.rec_file,
-                        text=fit_text(filename, self._fonts["recfile"][0],
-                                      int(self.width * 0.46)))
-
-    def show_idle(self, watch_path, size, note, detail, filename):
-        """녹화를 기다릴 때 채웁니다."""
-        c = self.canvas
-        c.itemconfigure(self.rec_folder,
-                        text=fit_text(watch_path, self._fonts["recfolder"][0],
-                                      int(self.width * 0.46)))
-        for item in (self.rec_time, self.rec_time_shadow):
-            c.itemconfigure(item, text="0:00:00")
-        number, _, unit = size.partition(" ")
-        c.itemconfigure(self.rec_unit, text=unit)
-        c.itemconfigure(self.rec_size, text=number)
-        self._place_size_value()
-        c.itemconfigure(self.rec_rate, text=note)
-        c.itemconfigure(self.rec_grow, text=detail)
         c.itemconfigure(self.rec_file,
                         text=fit_text(filename, self._fonts["recfile"][0],
                                       int(self.width * 0.46)))
@@ -508,9 +494,11 @@ class WallpaperView:
             return
         now = time.perf_counter()
         palette = sky.blend_palette(_now_hour())
-        phase = int(now / 30) if self._sky_key != "clear" else 0
+        palette["recording"] = self._mode == "rec"
+        phase = 0
         key = (self.width, self.height, tuple(palette["sky"]), palette["glow"],
-               self._sky_key, self._accent, phase)
+               self._sky_key, self._accent, phase, palette["season"],
+               round(palette["light"], 4), round(palette["veil"], 4), self._mode)
         self._baked_at = now
         if not force and key == self._bake_key:
             return
@@ -564,16 +552,38 @@ class WallpaperView:
             self._bg_pixels = pixels
             self.atmosphere.pixels = pixels
             self._paint_spectrum()
+            self._paint_foreground()
         if t >= 1:
             self._fade_source = self._fade_target = None
 
     def _paint_spectrum(self):
-        tint = sky.mix(self._palette["glow"], self._accent or (194, 213, 225), .38)
-        for i, (bar, reflection) in enumerate(zip(self.bar_items, self.reflection_items)):
+        for i, (bar, glow, reflection) in enumerate(zip(
+                self.bar_items, self.bar_glows, self.reflection_items)):
             x = self._bar_left + (self._bar_right - self._bar_left) * i / (SPECTRUM_BARS - 1)
-            ground = sky.sample(self._bg_pixels, x / self.width, self._bar_y / self.height)
-            self.canvas.itemconfigure(bar, fill=sky.to_hex(sky.mix(ground, tint, .56)))
-            self.canvas.itemconfigure(reflection, fill=sky.to_hex(sky.mix(ground, tint, .13)))
+            ground = sky.sample(self._bg_pixels, x / self.width, sky.horizon_y(x / self.width))
+            pos = i / (SPECTRUM_BARS - 1) * (len(RAINBOW) - 1)
+            stop = min(len(RAINBOW) - 2, int(pos))
+            tint = sky.mix(RAINBOW[stop], RAINBOW[stop + 1], pos - stop)
+            self.canvas.itemconfigure(bar, fill=sky.to_hex(tint))
+            self.canvas.itemconfigure(glow, fill=sky.to_hex(sky.mix(ground, tint, .22)))
+            self.canvas.itemconfigure(reflection, fill=sky.to_hex(sky.mix(ground, tint, .32)))
+
+    def _paint_foreground(self):
+        c = self.canvas
+        items = (self.phase_item, self.date_item, self.clock_item, self.sec_item,
+                 self.temp_item, self.desc_item, self.meta_item, self.meta2_item,
+                 self.rec_folder, self.rec_size, self.rec_unit, self.rec_rate,
+                 self.rec_grow, self.rec_file, self.tooltip, *self.control_items.values())
+        for item in items:
+            color = sky.foreground(self._bg_pixels, c.bbox(item), self.width, self.height)
+            c.itemconfigure(item, fill=color)
+        # 밝은 낮에 검은 그림자가 시계 글획을 두껍게 만들지 않도록 맞춥니다.
+        c.itemconfigure(self.clock_shadow, fill=c.itemcget(self.clock_item, "fill"))
+        color = sky.foreground(self._bg_pixels, c.bbox(self.rec_time), self.width, self.height)
+        c.itemconfigure(self.rec_time, fill="#b91f35" if color == "#030508" else REC_TIME_INK)
+        current = self.weather.current if self.weather else None
+        if current and current.ok:
+            self._set_weather_icon(current)
 
     def _update_bars(self, now, dt):
         levels = self.audio.levels if self.audio else (0.,) * BARS
@@ -582,21 +592,23 @@ class WallpaperView:
             speed = 21 if target > self._levels[i] else 6
             self._levels[i] += (target - self._levels[i]) * (1 - math.exp(-speed * dt))
         c, s = self.canvas, self.scale
-        for j, (bar, reflection) in enumerate(zip(self.bar_items, self.reflection_items)):
+        for j, (bar, glow, reflection) in enumerate(zip(
+                self.bar_items, self.bar_glows, self.reflection_items)):
             pos = j * (BARS - 1) / (SPECTRUM_BARS - 1)
             i, f = min(BARS - 2, int(pos)), pos - min(BARS - 2, int(pos))
             level = self._levels[i] * (1 - f) + self._levels[i + 1] * f
             edge = math.sin(math.pi * (j + 1) / (SPECTRUM_BARS + 1)) ** .45
-            height = level * self._bar_height * edge
+            height = level ** .72 * self._bar_height * edge
             x = self._bar_left + (self._bar_right - self._bar_left) * j / (SPECTRUM_BARS - 1)
+            baseline = sky.horizon_y(x / self.width) * self.height
             if height < .3:
                 c.coords(bar, -10, -10, -10, -10)
+                c.coords(glow, -10, -10, -10, -10)
                 c.coords(reflection, -10, -10, -10, -10)
                 continue
-            c.coords(bar, x, self._bar_y - height, x, self._bar_y)
-            c.coords(reflection, x, self._bar_y + 5 * s, x, self._bar_y + 5 * s + height * .3)
-            c.itemconfigure(bar, width=max(1, 2 * s))
-            c.itemconfigure(reflection, width=max(1, 2 * s))
+            c.coords(bar, x, baseline - height, x, baseline)
+            c.coords(glow, x, baseline - height, x, baseline)
+            c.coords(reflection, x, baseline + 6 * s, x, baseline + 6 * s + height * .17)
         for i, item in enumerate(self.play_dots):
             x = self._bar_right - (12 - i * 6) * s
             y = self._cover_xy[1] + 4 * s
@@ -613,7 +625,7 @@ class WallpaperView:
         self._last_frame = now
         try:
             if self._mode != "wall":
-                # 녹화·대기 화면에서는 표시등 맥박과 시각만 돌립니다.
+                # 녹화 화면에서는 표시등 맥박과 하늘만 돌립니다.
                 self._pulse_recording(now)
                 self._poll_sky(now)
                 if now - self._baked_at > 30:
@@ -806,17 +818,23 @@ class WallpaperView:
                 c.itemconfigure(self.moon_item, image="")
             _drop_image(self.parent, old)
         cx = min(b[0] for b in boxes) - 26 * s - size / 2
-        c.coords(self.moon_item, cx, 366 * sy)
+        c.coords(self.moon_item, cx, 342 * sy)
 
     def _set_weather_icon(self, current):
         size = max(1, round(WICON_SIZE * self.scale))
-        key = (size, current.icon, current.is_day)
+        dark = sky.foreground(self._bg_pixels, self.canvas.bbox(self.wicon_item),
+                              self.width, self.height) == "#030508"
+        key = (size, current.icon, current.is_day, dark)
         if key == self._weather_icon_key:
             return
         self._weather_icon_key = key
         self._weather_motion = current.sky if current.is_day else (
             "moon" if current.sky == "clear" else current.sky)
         color = weather_icons.color(current.icon, not current.is_day)
+        if dark:
+            color = {"clear": "#bc822b", "cloudy": "#557989", "rain": "#3484ad",
+                     "snow": "#487f9b", "fog": "#66818c", "storm": "#79629b"}.get(
+                         current.sky, "#557989")
         svg = weather_icons.svg(current.icon, color, not current.is_day)
         old = self._wicon_image
         try:
@@ -881,7 +899,8 @@ class WallpaperView:
         self.canvas.itemconfigure(self.tooltip, text=labels.get(self._hovered, ""))
         self.canvas.configure(cursor="hand2" if self._hovered else "")
         for key, item in self.control_items.items():
-            self.canvas.itemconfigure(item, fill=INK if key == self._hovered else INK_3)
+            self.canvas.itemconfigure(item, fill=sky.foreground(
+                self._bg_pixels, self.canvas.bbox(item), self.width, self.height))
 
     def _click(self, event):
         hit = self._hit_control(event.x, event.y)

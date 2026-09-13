@@ -6,7 +6,7 @@
 # 녹화 감시 화면은 가짜 파일로 흉내 냅니다. 실제 녹화 폴더는 건드리지 않으며,
 # 감시 경로에 사용자 이름이 드러나지 않도록 드라이브 바로 아래 임시 폴더를 씁니다.
 param(
-    [string]$FakeRoot = "F:\shadowplay record",
+    [string]$FakeRoot = "",
     [switch]$SkipWallpaper,
     [switch]$SkipRecording
 )
@@ -23,12 +23,19 @@ Add-Type -Name WinFind -Namespace SpnShot -MemberDefinition @'
 public struct RECT { public int Left, Top, Right, Bottom; }
 [DllImport("user32.dll", CharSet = CharSet.Unicode)]
 public static extern IntPtr FindWindowW(string lpClassName, string lpWindowName);
+public static IntPtr FindTitle(string title) { return FindWindowW(null, title); }
 [DllImport("user32.dll")]
 public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
 '@
 
 $root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 Set-Location $root
+$fakeBase = if ($FakeRoot) { [IO.Path]::GetFullPath($FakeRoot) } else { [IO.Path]::GetPathRoot($root) }
+$verifyRoot = [IO.Path]::GetFullPath((Join-Path $fakeBase ("SPN-capture-" + [Guid]::NewGuid().ToString("N").Substring(0, 8))))
+$basePrefix = [IO.Path]::GetFullPath($fakeBase).TrimEnd('\') + '\'
+if (-not $verifyRoot.StartsWith($basePrefix, [StringComparison]::OrdinalIgnoreCase)) {
+    throw "임시 폴더가 지정한 기준 경로를 벗어났습니다: $verifyRoot"
+}
 
 # 창 제목은 component/version.py 한 곳에서 정합니다.
 $verLine = Select-String -Path (Join-Path $root "component\version.py") `
@@ -47,7 +54,7 @@ function Stop-App {
 function Get-WindowSpot {
     # 창을 이름으로 찾아보고, 못 찾으면 앱과 같은 셈법으로 자리를 구합니다.
     for ($i = 0; $i -lt 8; $i++) {
-        $h = [SpnShot.WinFind]::FindWindowW($null, $title)
+        $h = [SpnShot.WinFind]::FindTitle($title)
         if ($h -ne [IntPtr]::Zero) {
             $r = New-Object SpnShot.WinFind+RECT
             if ([SpnShot.WinFind]::GetWindowRect($h, [ref]$r)) {
@@ -86,7 +93,7 @@ Stop-App
 if (-not $SkipWallpaper) {
     Write-Host "월페이퍼 화면을 찍습니다. 음악을 재생해 두면 곡 정보까지 담깁니다."
     $proc = Start-Process pythonw -WindowStyle Hidden -PassThru `
-        -ArgumentList @("ShadowPlayNotifier.py")
+        -ArgumentList @("ShadowPlayNotifier.py", "--topmost")
     Start-Sleep -Seconds 12
     Save-Shot (Get-WindowSpot) "wallpaper.png"
     Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
@@ -95,32 +102,43 @@ if (-not $SkipWallpaper) {
 
 if (-not $SkipRecording) {
     Write-Host "녹화 감시 화면을 찍습니다."
-    $folder = Join-Path $FakeRoot "FFRS"
-    if (Test-Path $FakeRoot) { Remove-Item $FakeRoot -Recurse -Force }
-    New-Item -ItemType Directory $folder -Force | Out-Null
+    $folder = Join-Path $verifyRoot "FFRS"
+    $proc = $null
+    $fs = $null
+    try {
+        New-Item -ItemType Directory -Path $folder -Force | Out-Null
+        $proc = Start-Process pythonw -WindowStyle Hidden -PassThru `
+            -ArgumentList @("ShadowPlayNotifier.py", "--dir", "`"$verifyRoot`"",
+                            "--interval", "0.4", "--topmost")
+        Start-Sleep -Seconds 9
+        $spot = Get-WindowSpot
 
-    $proc = Start-Process pythonw -WindowStyle Hidden -PassThru `
-        -ArgumentList @("ShadowPlayNotifier.py", "--dir", "`"$FakeRoot`"", "--interval", "0.4")
-    Start-Sleep -Seconds 9
-    $spot = Get-WindowSpot
-
-    $path = Join-Path $folder ("FFRS " + (Get-Date -Format "yyyy.MM.dd - HH.mm.ss") + ".mp4")
-    $fs = [System.IO.File]::Open($path, "Create", "Write", "Read")
-    $chunk = New-Object byte[] (1MB)
-    for ($i = 0; $i -lt 40; $i++) { $fs.Write($chunk, 0, $chunk.Length) }
-    $fs.Flush()
-    Start-Sleep -Milliseconds 1200
-    for ($i = 0; $i -lt 26; $i++) {
-        $fs.Write($chunk, 0, $chunk.Length); $fs.Flush()
-        Start-Sleep -Milliseconds 260
+        $path = Join-Path $folder ("FFRS " + (Get-Date -Format "yyyy.MM.dd - HH.mm.ss") + ".mp4")
+        $fs = [System.IO.File]::Open($path, "Create", "Write", "Read")
+        $chunk = New-Object byte[] (1MB)
+        for ($i = 0; $i -lt 40; $i++) { $fs.Write($chunk, 0, $chunk.Length) }
+        $fs.Flush()
+        Start-Sleep -Milliseconds 1200
+        for ($i = 0; $i -lt 26; $i++) {
+            $fs.Write($chunk, 0, $chunk.Length)
+            $fs.Flush()
+            Start-Sleep -Milliseconds 260
+        }
+        Save-Shot $spot "main.png"
+    } finally {
+        if ($null -ne $fs) { $fs.Dispose() }
+        if ($null -ne $proc) {
+            Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+        }
+        Start-Sleep -Milliseconds 900
+        $safeLeaf = Split-Path -Leaf $verifyRoot
+        if ($verifyRoot.StartsWith($basePrefix, [StringComparison]::OrdinalIgnoreCase) -and
+            $safeLeaf.StartsWith("SPN-capture-", [StringComparison]::OrdinalIgnoreCase) -and
+            (Test-Path -LiteralPath $verifyRoot)) {
+            Remove-Item -LiteralPath $verifyRoot -Recurse -Force
+        }
+        Write-Host ("임시 폴더 정리: " + (-not (Test-Path -LiteralPath $verifyRoot)))
     }
-    Save-Shot $spot "main.png"
-    $fs.Close()
-
-    Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
-    Start-Sleep -Milliseconds 900
-    Remove-Item $FakeRoot -Recurse -Force -ErrorAction SilentlyContinue
-    Write-Host ("임시 폴더 정리: " + (-not (Test-Path $FakeRoot)))
 }
 
 Write-Host ("남은 프로세스: " + (@(Get-CimInstance Win32_Process -Filter "Name = 'pythonw.exe'" |

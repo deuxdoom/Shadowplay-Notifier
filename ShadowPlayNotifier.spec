@@ -58,6 +58,23 @@ VERSION = read_meta("VERSION", "0.0.0")
 AUTHOR = read_meta("AUTHOR", "deuxdoom")
 ICON = os.path.join(SPECPATH, "appicon.ico")
 
+
+def season_photos():
+    """계절 사진 네 장입니다.
+
+    폴더째 넣으면 갈아 끼우고 남은 예전 사진과 출처 문서까지 따라 들어갑니다.
+    component/sky.py 와 같은 차례로 확장자를 골라 실제로 읽는 것만 넣습니다.
+    """
+    folder = os.path.join(SPECPATH, "assets", "wallpapers")
+    found = []
+    for season in ("spring", "summer", "autumn", "winter"):
+        for ext in (".png", ".jpg", ".jpeg"):
+            path = os.path.join(folder, season + ext)
+            if os.path.isfile(path):
+                found.append((path, os.path.join("assets", "wallpapers")))
+                break
+    return found
+
 a = Analysis(
     [os.path.join(SPECPATH, "ShadowPlayNotifier.py")],
     pathex=[SPECPATH],
@@ -68,7 +85,7 @@ a = Analysis(
             os.path.join("assets", "fonts")),
            # 날씨 옆에 띄우는 달 사진입니다.
            (os.path.join(SPECPATH, "assets", "moon.png"), "assets"),
-           ] + ([(ICON, ".")] if os.path.isfile(ICON) else []),
+           ] + season_photos() + ([(ICON, ".")] if os.path.isfile(ICON) else []),
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

@@ -11,6 +11,7 @@ import json
 import math
 import sys
 import time
+import datetime
 from pathlib import Path
 from types import SimpleNamespace
 from collections import deque
@@ -19,7 +20,7 @@ import threading
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import tkinter as tk
-from component import display, fonts, wallpaper
+from component import display, fonts, wallpaper, sky
 from component.nowplaying import Track
 from component.weather import Weather
 
@@ -47,12 +48,16 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--seconds", type=float, default=180)
     parser.add_argument("--scene", type=int, default=0)
+    parser.add_argument("--season", choices=tuple(sky.SEASONS))
     parser.add_argument("--size", default="960x640")
     parser.add_argument("--empty", action="store_true")
     parser.add_argument("--profile", action="store_true")
     parser.add_argument("--cycle", action="store_true")
     parser.add_argument("--controls", action="store_true")
     args = parser.parse_args()
+    if args.season:
+        original_palette = sky.blend_palette
+        sky.blend_palette = lambda hour: original_palette(hour, args.season)
     display.enable_dpi_awareness()
     fonts.load()
     root = tk.Tk()
@@ -147,7 +152,10 @@ def main():
         text = "%02d:%02d" % (int(hour), round((hour % 1) * 60))
         for item in (view.clock_item, view.clock_shadow):
             view.canvas.itemconfigure(item, text=text)
-        view.canvas.itemconfigure(view.date_item, text="2026년 9월 13일   일요일")
+        month = {"spring": 4, "summer": 7, "autumn": 10, "winter": 1}.get(args.season, 9)
+        date = datetime.date(2026, month, 13)
+        view.canvas.itemconfigure(view.date_item, text="%d년 %d월 %d일   %s" % (
+            date.year, date.month, date.day, wallpaper.DOW[date.weekday()]))
         view.canvas.itemconfigure(view.sec_item, text="%02d" % (int(time.time()) % 60))
         view._position_seconds()
 

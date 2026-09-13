@@ -1,8 +1,8 @@
 r"""보조 디스플레이에 창을 강제로 띄워 960x640 레이아웃을 눈으로 확인합니다.
 
-실행: python test\preview_gui.py [rec|idle|long] [모니터번호] [표시시간초] [nb] [full]
+실행: python test\preview_gui.py [rec|wall|long] [모니터번호] [표시시간초] [nb] [full]
   rec  : 녹화중 화면 (기본값)
-  idle : 대기중 화면
+  wall : 월페이퍼 화면
   long : 폴더 이름이 길어 글자 크기가 줄어드는 경우
 모니터 번호는 왼쪽 위 좌표 순서이며 기본값은 1(보조 디스플레이)입니다.
 네 번째 인자로 nb 를 주면 타이틀바 없는 상태를 확인합니다.
@@ -35,7 +35,7 @@ SETTINGS = {
     "interval": 1.0, "stall": 8.0, "min_size": 1048576,
     "min_growth": 262144, "recursive": True, "beep": False,
     "topmost": False, "borderless": BORDERLESS, "monitor": MONITOR,
-    "wallpaper": False,
+    "latitude": 37.5665, "longitude": 126.978,
 }
 
 

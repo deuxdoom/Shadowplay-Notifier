@@ -168,16 +168,33 @@ class WatchSupervisor:
         self.sink = sink
         self.thread = None
         self.stop_event = None
+        self.generation = 0
+        self._retired = []
 
     def start(self, settings):
-        self.stop()
+        self.stop(.25)
+        generation = self.generation
+
+        def current_sink(event):
+            # 종료 중인 이전 감시자가 뒤늦게 낸 사건은 새 설정 화면에 섞지 않습니다.
+            if generation == self.generation:
+                self.sink(event)
+
         self.stop_event = threading.Event()
-        self.thread = WatchThread(make_watcher(settings, self.sink),
+        self.thread = WatchThread(make_watcher(settings, current_sink),
                                   self.stop_event)
         self.thread.start()
 
-    def stop(self):
-        if self.stop_event is not None:
-            self.stop_event.set()
+    def stop(self, wait=0.0):
+        self.generation += 1
+        event, thread = self.stop_event, self.thread
+        if event is not None:
+            event.set()
+        if thread is not None and thread.is_alive():
+            if wait and thread is not threading.current_thread():
+                thread.join(wait)
+            if thread.is_alive():
+                self._retired.append(thread)
+        self._retired = [old for old in self._retired if old.is_alive()]
         self.stop_event = None
         self.thread = None

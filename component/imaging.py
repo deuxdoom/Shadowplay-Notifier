@@ -184,6 +184,34 @@ def cover_ppm(data, size):
             gdiplus.GdipDisposeImage(src)
 
 
+def photo_rgb(data, width, height):
+    """번들 풍경 사진을 화면비에 맞춰 중앙 크롭한 RGB로 읽습니다."""
+    if not start():
+        raise OSError("GDI+ unavailable")
+    src = dst = None
+    graphics = c_void_p()
+    try:
+        src = _bitmap_from_bytes(data)
+        iw, ih = ctypes.c_uint(), ctypes.c_uint()
+        gdiplus.GdipGetImageWidth(src, byref(iw))
+        gdiplus.GdipGetImageHeight(src, byref(ih))
+        scale = max(width / iw.value, height / ih.value)
+        dw, dh = round(iw.value * scale), round(ih.value * scale)
+        dst = _new_bitmap(width, height)
+        gdiplus.GdipGetImageGraphicsContext(dst, byref(graphics))
+        gdiplus.GdipSetInterpolationMode(graphics, INTERPOLATION_HQ_BICUBIC)
+        gdiplus.GdipDrawImageRectI(graphics, src, (width - dw) // 2,
+                                 (height - dh) // 2, dw, dh)
+        return _to_ppm(dst, width, height).split(b"\n", 3)[3]
+    finally:
+        if graphics:
+            gdiplus.GdipDeleteGraphics(graphics)
+        if dst:
+            gdiplus.GdipDisposeImage(dst)
+        if src:
+            gdiplus.GdipDisposeImage(src)
+
+
 def rounded_cover_png(data, size, radius):
     """둥근 커버 한 장. 표준 라이브러리로 PNG 알파를 만들며 캐시하지 않습니다."""
     ppm = cover_ppm(data, size)
@@ -258,6 +286,69 @@ def dominant_color(data, fallback=(120, 120, 132)):
             gdiplus.GdipDisposeImage(src)
 
 
+def _bitmap_from_rgb(pixels, width, height, alpha=255):
+    """채널 슬라이스로 전송해 픽셀마다 ctypes에 접근하지 않습니다."""
+    if len(pixels) != width * height * 3:
+        raise ValueError("RGB buffer size mismatch")
+    bitmap = _new_bitmap(width, height)
+    data = _BitmapData()
+    rect = _Rect(0, 0, width, height)
+    status = gdiplus.GdipBitmapLockBits(bitmap, byref(rect), 2,
+                                      PIXEL_FORMAT_32BPP_ARGB, byref(data))
+    if status:
+        gdiplus.GdipDisposeImage(bitmap)
+        raise OSError("RGB bitmap lock failed (%d)" % status)
+    try:
+        rgba = bytearray(width * height * 4)
+        rgba[0::4], rgba[1::4], rgba[2::4] = pixels[2::3], pixels[1::3], pixels[0::3]
+        rgba[3::4] = bytes((alpha,)) * (width * height)
+        raw = bytes(rgba)
+        if data.Stride == width * 4:
+            ctypes.memmove(data.Scan0, raw, len(raw))
+        else:
+            for y in range(height):
+                ctypes.memmove(data.Scan0 + y * data.Stride,
+                               raw[y * width * 4:(y + 1) * width * 4], width * 4)
+    except Exception:
+        gdiplus.GdipBitmapUnlockBits(bitmap, byref(data))
+        gdiplus.GdipDisposeImage(bitmap)
+        raise
+    gdiplus.GdipBitmapUnlockBits(bitmap, byref(data))
+    return bitmap
+
+
+def blend_rgb(first, second, width, height, fraction):
+    """GDI+의 알파 합성으로 배경 전환의 UI 스레드 점유를 줄입니다."""
+    if fraction <= 0:
+        return first
+    if fraction >= 1:
+        return second
+    if not start():
+        return None
+    src = dst = None
+    graphics = c_void_p()
+    try:
+        dst = _bitmap_from_rgb(first, width, height)
+        src = _bitmap_from_rgb(second, width, height, round(fraction * 255))
+        status = gdiplus.GdipGetImageGraphicsContext(dst, byref(graphics))
+        if status:
+            raise OSError("Blend context failed (%d)" % status)
+        status = gdiplus.GdipDrawImageRectI(graphics, src, 0, 0, width, height)
+        if status:
+            raise OSError("Blend failed (%d)" % status)
+        return _to_ppm(dst, width, height).split(b"\n", 3)[3]
+    except Exception as exc:
+        detail("[그림] 네이티브 전환 실패: %s" % exc)
+        return None
+    finally:
+        if graphics:
+            gdiplus.GdipDeleteGraphics(graphics)
+        if src:
+            gdiplus.GdipDisposeImage(src)
+        if dst:
+            gdiplus.GdipDisposeImage(dst)
+
+
 def upscale_rgb(pixels, small_w, small_h, width, height):
     """작게 계산한 RGB 를 늘려 PPM 으로 만듭니다.
 
@@ -271,24 +362,7 @@ def upscale_rgb(pixels, small_w, small_h, width, height):
     src = None
     dst = None
     try:
-        src = _new_bitmap(small_w, small_h)
-        data = _BitmapData()
-        rect = _Rect(0, 0, small_w, small_h)
-        gdiplus.GdipBitmapLockBits(src, byref(rect), 3,  # ReadWrite
-                                   PIXEL_FORMAT_32BPP_ARGB, byref(data))
-        stride = data.Stride
-        buf = (ctypes.c_ubyte * (stride * small_h)).from_address(data.Scan0)
-        for y in range(small_h):
-            base = y * stride
-            row = y * small_w * 3
-            for x in range(small_w):
-                i = base + x * 4
-                j = row + x * 3
-                buf[i] = pixels[j + 2]
-                buf[i + 1] = pixels[j + 1]
-                buf[i + 2] = pixels[j]
-                buf[i + 3] = 255
-        gdiplus.GdipBitmapUnlockBits(src, byref(data))
+        src = _bitmap_from_rgb(pixels, small_w, small_h)
         dst = _draw_scaled(src, width, height)
         return _to_ppm(dst, width, height)
     except Exception as exc:

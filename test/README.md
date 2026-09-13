@@ -7,13 +7,14 @@
 ## 월페이퍼 디자인 검증
 
 `python test/test_wallpaper.py`는 실제 Tk와 GDI+로 11개 해상도, 긴 한글·일본어 제목,
-36개 시간대·날씨 조합의 글자 대비, 커버 교체와 반복 전환의 이미지·도형·예약
+96개 계절·시간대·날씨 조합의 글자 대비(아침·저녁 전환 포함), 커버 교체와 반복 전환의 이미지·도형·예약
 콜백 수, 간헐적 효과와 녹화/전체화면 전환을 검사합니다. 네트워크는 사용하지 않습니다.
 
 `python test/wallpaper_preview.py --seconds 180`은 보조 디스플레이에 디자인
 미리보기를 띄웁니다. 방향키는 시간·날씨 전환, Space는 음악 유무, F11은 확대,
 Esc는 종료입니다. `--scene 0`부터 `8`까지 여명·한낮·노을·밤·비·안개·눈·뇌우·흐림을
-고를 수 있으며 `--size 1920x1080`, `--empty`도 지원합니다. 미리보기 곡과 날씨는
+고를 수 있으며 `--season spring|summer|autumn|winter`, `--size 1920x1080`,
+`--empty`도 지원합니다. 미리보기 곡과 날씨는
 검증용 가상 데이터입니다.
 
 `python test/wallpaper_preview.py --seconds 300 --profile --cycle`은 장면과 음악,
@@ -84,7 +85,7 @@ python test\test_placement.py
 ## test_layout.py
 
 실제 Tk 위젯으로 960×640, FHD, QHD, 4K, 울트라와이드, 세로 화면 등 11개
-해상도의 영역 비율과 글자 잘림을 검사합니다. 대기·녹화·긴 폴더 이름을 확인하고,
+해상도의 영역 비율과 글자 잘림을 검사합니다. 월페이퍼·녹화·긴 폴더 이름을 확인하고,
 F11 과 확대된 전체화면 버튼으로 전환을 반복해 원래 위치·글꼴·로그 배치 복원도 봅니다.
 실행 중인 앱을 닫은 뒤 `python test/test_layout.py` 로 실행하십시오.
 
@@ -95,10 +96,10 @@ F11 과 확대된 전체화면 버튼으로 전환을 반복해 원래 위치·�
 
 ```
 powershell -ExecutionPolicy Bypass -File test\preview.ps1 -Mode rec -Borderless
-powershell -ExecutionPolicy Bypass -File test\preview.ps1 -Mode idle -Monitor 1
+powershell -ExecutionPolicy Bypass -File test\preview.ps1 -Mode wall -Monitor 1
 ```
 
-- `-Mode rec` 는 녹화중 화면, `-Mode idle` 은 대기중 화면, `-Mode long` 은 폴더
+- `-Mode rec` 는 녹화중 화면, `-Mode wall` 은 월페이퍼 화면, `-Mode long` 은 폴더
   이름이 길어서 글자 크기가 자동으로 줄어드는 경우입니다.
 - `-Borderless` 를 주면 타이틀바 없는 상태를 확인합니다.
 - `-Fullscreen -Monitor 0` 을 함께 주면 주 모니터 전체화면을 확인합니다.
@@ -115,8 +116,8 @@ powershell -ExecutionPolicy Bypass -File test\preview.ps1 -Mode idle -Monitor 1
 powershell -ExecutionPolicy Bypass -File test\live_check.ps1 -Interval 0.5 -Stall 4
 ```
 
-대기 → 녹화중 → 대기로 돌아오는 세 시점을 `test\live_1_idle.png`,
-`live_2_recording.png`, `live_3_back_to_idle.png` 로 남기고, 마지막에 `monitor.log` 의
+월페이퍼 → 녹화중 → 월페이퍼로 돌아오는 세 시점을 `test\live_1_wallpaper.png`,
+`live_2_recording.png`, `live_3_back_to_wallpaper.png` 로 남기고, 마지막에 `monitor.log` 의
 끝부분을 출력합니다. 파일이 커지기 시작한 시각과 로그의 감지 시각을 견주어 보면
 반응 속도를 알 수 있습니다.
 

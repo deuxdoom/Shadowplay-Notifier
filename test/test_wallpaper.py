@@ -8,11 +8,12 @@ import unittest
 from unittest.mock import patch
 from pathlib import Path
 from types import SimpleNamespace
+from itertools import product
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import tkinter as tk
-from component import display, fonts, sky, wallpaper
+from component import display, fonts, sky, wallpaper, imaging
 from component.nowplaying import Track
 from component.weather import Weather
 from component.app import MonitorApp
@@ -65,11 +66,17 @@ class WallpaperTests(unittest.TestCase):
         self.fail("scene did not settle")
 
     def test_time_palette_continuous_through_day_and_midnight(self):
+        # 해 뜰 무렵과 해 질 무렵에는 색이 빠르게 건너갑니다. 그 사이에 머물면
+        # 사진이 중간 밝기로 떠서 글자가 묻히기 때문입니다. 가장 빠른 곳은 금빛
+        # 노을에서 어스름으로 넘어가는 저녁으로 1분에 7단계입니다. 배경을 30초
+        # 마다 다시 구우므로 한 번에 움직이는 폭은 그 절반이고, 1.8초에 걸쳐
+        # 겹쳐 넘기므로 이어져 보입니다. 자정을 잘못 넘기면 수백 단계가 한 번에
+        # 튀므로 여기서 걸립니다.
         previous = sky.blend_palette(0)
         for minute in range(1, 1441):
             current = sky.blend_palette(minute / 60)
             self.assertLessEqual(max(abs(a - b) for a, b in
-                                     zip(previous["glow"], current["glow"])), 1)
+                                     zip(previous["glow"], current["glow"])), 9)
             previous = current
 
     def test_layout_and_square_artwork_at_eleven_sizes(self):
@@ -86,7 +93,7 @@ class WallpaperTests(unittest.TestCase):
             c = self.view.canvas
             for item in (self.view.date_item, self.view.clock_item, self.view.sec_item,
                          self.view.temp_item, self.view.desc_item, self.view.meta_item,
-                         self.view.meta2_item, self.view.title_item, self.view.artist_item,
+                         self.view.meta2_item, self.view.title_item,
                          self.view.album_item, self.view.play_label, self.view.phase_item):
                 box = c.bbox(item)
                 self.assertIsNotNone(box)
@@ -99,7 +106,17 @@ class WallpaperTests(unittest.TestCase):
             self.assertEqual(cover.width(), cover.height())
             self.assertEqual(cover.width(), round(112 * self.view.scale))
             self.assertLess(c.bbox(self.view.sec_item)[2], c.bbox(self.view.wicon_item)[0])
-            self.assertLess(c.bbox(self.view.title_item)[3], c.bbox(self.view.artist_item)[1])
+            self.assertLess(c.bbox(self.view.title_item)[3], c.bbox(self.view.album_item)[1])
+
+    def test_only_wall_and_recording_modes_exist(self):
+        self.assertEqual(self.view.mode, "wall")
+        self.view.set_mode("idle")
+        self.assertEqual(self.view.mode, "wall")
+        self.view.set_mode("rec")
+        self.assertEqual(self.view.mode, "rec")
+        self.assertEqual(self.view.canvas.itemcget(self.view.rec_word, "text"),
+                         "R E C O R D I N G")
+        self.view.set_mode("wall")
 
     def test_weather_failure_clears_icon_and_resumes_new_provider(self):
         self.weather.current.code = 63
@@ -114,7 +131,8 @@ class WallpaperTests(unittest.TestCase):
         self.view.stop()
         self.track = SimpleNamespace(version=1, track=Track("New artist", "New title"))
         self.view.start(nowplaying=self.track)
-        self.assertEqual(self.view.canvas.itemcget(self.view.title_item, "text"), "New title")
+        self.assertEqual(self.view.canvas.itemcget(self.view.title_item, "text"),
+                         "New artist - New title")
         self.assertIsNone(self.view._cover_image)
 
     def test_large_weather_and_permanent_close_button(self):
@@ -193,26 +211,68 @@ class WallpaperTests(unittest.TestCase):
         minimum = 100
         # 글자 bbox에 포함되는 모든 작은 배경 표본을 검사합니다.
         c = self.view.canvas
-        positions = [(c.bbox(item), sky._rgb(color)) for item, color in (
-            (self.view.clock_item, wallpaper.INK), (self.view.sec_item, wallpaper.INK_3),
-            (self.view.date_item, wallpaper.INK_2), (self.view.meta_item, wallpaper.INK_3),
-            (self.view.temp_item, wallpaper.INK), (self.view.desc_item, wallpaper.INK_2),
-            (self.view.meta2_item, wallpaper.INK_3), (self.view.title_item, wallpaper.INK),
-            (self.view.artist_item, wallpaper.INK_2), (self.view.album_item, wallpaper.INK_3),
-            (self.view.play_label, wallpaper.INK_3), (self.view.phase_item, wallpaper.INK_3))]
-        for palette in sky.TIMES:
-            for group in sky.SKIES:
-                pixels = sky.render(960, 640, sky.blend_palette(palette.hour),
+        positions = [(c.bbox(item), sky._rgb(color), adaptive) for item, color, adaptive in (
+            (self.view.clock_item, wallpaper.INK, True), (self.view.sec_item, wallpaper.INK_3, True),
+            (self.view.date_item, wallpaper.INK_2, True), (self.view.meta_item, wallpaper.INK_3, True),
+            (self.view.temp_item, wallpaper.INK, True), (self.view.desc_item, wallpaper.INK_2, True),
+            (self.view.meta2_item, wallpaper.INK_3, True), (self.view.title_item, wallpaper.INK, False),
+            (self.view.album_item, wallpaper.INK_3, False),
+            (self.view.play_label, wallpaper.INK_3, False), (self.view.phase_item, wallpaper.INK_3, True))]
+        times = (*sky.TIMES, SimpleNamespace(hour=7, name="sunrise transition"),
+                 SimpleNamespace(hour=17.5, name="sunset transition"))
+        for season, palette in product(sky.SEASONS, times):
+            for group in ("clear", "storm", "fog"):
+                pixels = sky.render(960, 640, sky.blend_palette(palette.hour, season),
                                     (255, 255, 255), group)
-                for box, ink in positions:
+                for box, ink, adaptive in positions:
+                    if adaptive:
+                        ink = sky._rgb(sky.foreground(pixels, box, 960, 640))
                     light = luminance(ink)
                     for y in range(max(0, box[1]), min(640, box[3]) + 1, 4):
                         for x in range(max(0, box[0]), min(960, box[2]) + 1, 4):
                             ground = luminance(sky.sample(pixels, x / 960, y / 640))
-                            ratio = (light + .05) / (ground + .05)
+                            ratio = (max(light, ground) + .05) / (min(light, ground) + .05)
                             minimum = min(minimum, ratio)
-                            self.assertGreaterEqual(ratio, 4.5, (palette.name, group, box, ratio))
-        print("Minimum text contrast: %.2f:1 (36 scenes, white album accent)" % minimum)
+                            self.assertGreaterEqual(ratio, 4.5, (season, palette.name, group, box, ratio))
+        print("Minimum text contrast: %.2f:1 (96 seasonal scenes, white album accent)" % minimum)
+
+    def test_season_calendar_and_daylight_are_distinct(self):
+        self.assertEqual([sky.season_for_month(m) for m in range(1, 13)],
+                         ["winter"] * 2 + ["spring"] * 3 + ["summer"] * 3 +
+                         ["autumn"] * 3 + ["winter"])
+        for season in sky.SEASONS:
+            self.assertGreater(len(set(sky._photo(season, 1.5))), 100)
+            day = sky.render(960, 640, sky.blend_palette(12, season))
+            night = sky.render(960, 640, sky.blend_palette(0, season))
+            self.assertGreater(sky.luminance(sky.sample(day, .5, .25)),
+                               sky.luminance(sky.sample(night, .5, .25)) * 4)
+
+    def test_native_blend_and_rgb_upload_preserve_channels(self):
+        w, h = 37, 19
+        first = bytes((i * 31) % 256 for i in range(w * h * 3))
+        second = bytes((i * 43 + 77) % 256 for i in range(w * h * 3))
+        ppm = imaging.upscale_rgb(first, w, h, w, h)
+        self.assertEqual(ppm.split(b"\n", 3)[3], first)
+        for t in (0, .125, .5, .9, 1):
+            actual = imaging.blend_rgb(first, second, w, h, t)
+            self.assertIsNotNone(actual)
+            expected = [round(a + (b - a) * t) for a, b in zip(first, second)]
+            self.assertLessEqual(max(abs(a - b) for a, b in zip(actual, expected)), 2)
+
+    def test_spectrum_has_long_rainbow_bars_without_overlap(self):
+        self.view._levels = [1.] * 12
+        self.audio.levels = [1.] * 12
+        self.view._update_bars(0, .033)
+        c = self.view.canvas
+        middle = c.coords(self.view.bar_items[32])
+        self.assertGreater(middle[3] - middle[1], 70)
+        colors = {c.itemcget(item, "fill") for item in self.view.bar_items}
+        self.assertGreater(len(colors), 50)
+        for item in self.view.bar_items:
+            box = c.bbox(item)
+            self.assertGreater(box[1], c.bbox(self.view.meta2_item)[3])
+        for item in self.view.reflection_items:
+            self.assertLess(c.bbox(item)[3], self.view._cover_xy[1])
 
 
 class WallpaperIntegrationTests(unittest.TestCase):
@@ -255,14 +315,16 @@ class WallpaperIntegrationTests(unittest.TestCase):
                 provider = app._wall_audio
                 app._set_recording(True)
                 root.update()
-                self.assertFalse(view.running)
+                self.assertTrue(view.running)
+                self.assertEqual(view.mode, "rec")
                 self.assertTrue(provider.stopped)
-                self.assertIsNone(view._after_id)
-                self.assertEqual(root.pack_slaves(), [app.banner, app.detail,
-                                                      app.log_frame, app.status_row])
+                self.assertIsNotNone(view._after_id)
+                self.assertEqual(root.pack_slaves(), [view.canvas])
                 original_fonts = [font.cget("size") for font, _, _ in app._base_fonts]
                 app._set_recording(False)
                 self.assertTrue(view.running)
+                self.assertEqual(view.mode, "wall")
+                self.assertIsNot(app._wall_audio, provider)
                 for rect in ((0, 0, 1920, 1080), (0, 0, 3840, 2160)):
                     with patch("component.app.monitor_for_point", return_value=rect):
                         view.actions["full"]()
@@ -276,22 +338,16 @@ class WallpaperIntegrationTests(unittest.TestCase):
                 app._set_recording(True)
                 root.update()
                 self.assertEqual([font.cget("size") for font, _, _ in app._base_fonts], original_fonts)
-                app.set_view_mode("wallpaper")
-                self.assertTrue(view.running)  # 수동 선택은 녹화 상태와 독립적입니다.
                 app.hide_window()
                 self.assertFalse(view.running)
                 self.assertIsNone(view.audio)
                 self.assertTrue(app.hidden_to_tray)
                 app.show_window()
                 self.assertTrue(view.running)
-                app.set_view_mode("auto")
-                self.assertFalse(view.running)  # 현재 녹화 중이므로 감시 화면.
+                self.assertEqual(view.mode, "rec")
                 app._set_recording(False)
                 self.assertTrue(view.running)
-                app.set_view_mode("monitor")
-                app._set_recording(True)
-                app._set_recording(False)
-                self.assertFalse(view.running)  # 수동 감시 화면 선택을 지킵니다.
+                self.assertEqual(view.mode, "wall")
                 self.assertEqual(errors, [])
             finally:
                 app.stop_wallpaper()

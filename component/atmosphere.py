@@ -50,9 +50,19 @@ class Atmosphere:
             self.canvas.itemconfigure("atmosphere", state="hidden")
             self._star_at = -1
 
-    def _color(self, x, y, strength, tint=(180, 207, 225)):
-        return sky.to_hex(sky.mix(sky.sample(self.pixels, x / self.width,
-                                            y / self.height), tint, strength))
+    def _color(self, x, y, strength, tint=None, bright=None):
+        """배경이 밝으면 짙게, 어두우면 환하게 칠해 효과가 묻히지 않게 합니다.
+
+        밝은 낮 사진 위에 옅은 하늘색을 얹으면 배경과 같은 색이 되어 물방울도
+        눈송이도 보이지 않습니다. ``bright`` 를 주면 밝은 배경에서 그 색을 쓰고,
+        주지 않으면 어두운 색으로 바꿔 칠합니다.
+        """
+        ground = sky.sample(self.pixels, x / self.width, y / self.height)
+        # 글자 색을 고를 때와 같은 경계입니다. 낮의 배경은 이보다 밝고 밤의
+        # 배경은 어둡습니다.
+        if sky.luminance(ground) > .18:
+            tint, strength = bright or (16, 24, 38), min(.95, strength * 2)
+        return sky.to_hex(sky.mix(ground, tint or (180, 207, 225), strength))
 
     def update(self, now):
         c, w, h, s = self.canvas, self.width, self.height, self.scale
@@ -116,7 +126,12 @@ class Atmosphere:
             py = ((y + t * .019 * speed) % 1) * h
             r = (1 + speed) * s
             c.coords(item, px - r, py - r, px + r, py + r)
-            c.itemconfigure(item, state="normal", fill=self._color(px, py, fade * .36))
+            # 눈은 어느 배경에서도 흰 알갱이입니다. 밝은 사진 위에서는 흰색만으로
+            # 구별되지 않으므로 가장자리에 짙은 테를 둘러 윤곽을 살립니다.
+            bright = sky.luminance(sky.sample(self.pixels, px / w, py / h)) > .3
+            c.itemconfigure(item, state="normal",
+                            fill=self._color(px, py, fade * .36, bright=(252, 254, 255)),
+                            outline=self._color(px, py, fade * .55) if bright else "")
 
     def _shooting_star(self, now):
         if self._meteor is None and now >= self._next_meteor:
