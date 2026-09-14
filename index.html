@@ -330,6 +330,9 @@ footer .links { display: flex; gap: 18px; flex: none; }
   <symbol id="i-monitor" viewBox="0 0 24 24"><rect x="2.5" y="4" width="19" height="13" rx="1.5"/><path d="M8.5 21h7M12 17v4"/></symbol>
   <symbol id="i-tray" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="1.5"/><path d="M3 14.5h5l1.4 2h5.2l1.4-2H21"/></symbol>
   <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 3.5v12M7.5 11.5 12 16l4.5-4.5M4.5 20h15"/></symbol>
+  <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3.3 9.5h17.4M3.3 14.5h17.4"/><path d="M12 3a14 14 0 0 1 0 18 14 14 0 0 1 0-18"/></symbol>
+  <symbol id="i-sync" viewBox="0 0 24 24"><path d="M20 12a8 8 0 0 1-13.7 5.6M4 12a8 8 0 0 1 13.7-5.6"/><path d="M17.7 3v3.6h-3.6M6.3 21v-3.6h3.6"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13.2 3 5.5 13.4h5.6L10.8 21l7.7-10.4h-5.6z"/></symbol>
   <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></symbol>
   <symbol id="i-github" viewBox="0 0 24 24"><path d="M9 19.2c-4.4 1.3-4.4-2.3-6.2-2.8m12.4 5.4v-3.5c0-1 .1-1.4-.5-2 2.7-.3 5.3-1.4 5.3-6a4.7 4.7 0 0 0-1.3-3.2 4.3 4.3 0 0 0-.1-3.3s-1.1-.3-3.5 1.3a12 12 0 0 0-6.2 0C6.5 3.5 5.4 3.8 5.4 3.8a4.3 4.3 0 0 0-.1 3.3A4.7 4.7 0 0 0 4 10.3c0 4.6 2.6 5.7 5.3 6-.4.4-.5.9-.5 1.5v4.1"/></symbol>
 </svg>
@@ -363,7 +366,7 @@ footer .links { display: flex; gap: 18px; flex: none; }
     <div class="hero-tags">
       <p class="status"><span class="dot"></span><span class="mono">Watching · Idle</span></p>
       <a class="relpill" href="https://github.com/deuxdoom/Shadowplay-Notifier/releases/latest">
-        <span class="mono">Release</span><b data-ver>v2.3.0</b>
+        <span class="mono">Release</span><b data-ver>v2.4.0</b>
         <svg class="icon" aria-hidden="true"><use href="#i-chevron"/></svg>
       </a>
     </div>
@@ -427,7 +430,7 @@ footer .links { display: flex; gap: 18px; flex: none; }
   <div class="shell">
     <div class="head reveal">
       <span class="mono">Features</span>
-      <h2>한 화면에 담은 아홉 가지</h2>
+      <h2>한 화면에 담은 열두 가지</h2>
       <p>보조 모니터를 늘 켜 두는 자리에 맞추어, 멀리서도 읽히는 크기로 필요한 것만 띄웁니다.</p>
     </div>
     <div class="cells reveal">
@@ -449,12 +452,12 @@ footer .links { display: flex; gap: 18px; flex: none; }
       <article class="cell">
         <div class="cell-top"><svg class="icon"><use href="#i-clock"/></svg><span class="no">04</span></div>
         <h3>시계와 날씨</h3>
-        <p>Pretendard로 맞춘 큰 시계와 날짜, 요일에 더해 기온과 오늘 달, 날씨 정보를 띄웁니다. 콜론만 매초 깜빡이고 초 숫자는 계속 표시됩니다. 달은 작은 화면에서도 윤곽이 보입니다. 날씨는 Open-Meteo 에서 받으며 API 키가 필요 없습니다.</p>
+        <p>Pretendard로 맞춘 큰 시계와 날짜, 요일에 더해 기온과 오늘 달, 날씨 정보를 띄웁니다. 시계를 누르면 24시간과 12시간 표시를 오가고, 토요일과 일요일은 색으로 구분합니다. 콜론만 매초 깜빡이고 초 숫자는 계속 표시됩니다. 날씨는 Open-Meteo 에서 받으며 API 키가 필요 없고, 볼 곳은 도시 이름으로 고릅니다.</p>
       </article>
       <article class="cell">
         <div class="cell-top"><svg class="icon"><use href="#i-music"/></svg><span class="no">05</span></div>
         <h3>재생 중인 음악</h3>
-        <p>Spotify 에서 듣고 있는 곡과 아티스트, 앨범 커버를 보여 줍니다. 로그인이나 계정 연결을 요구하지 않습니다.</p>
+        <p>Spotify 에서 듣고 있는 곡과 아티스트, 앨범 커버를 보여 줍니다. 로그인이나 계정 연결을 요구하지 않습니다. 한 줄에 다 들어가지 않는 긴 이름은 잘라 내지 않고 옆으로 흘려보냈다가 다시 앞으로 돌아옵니다.</p>
       </article>
       <article class="cell">
         <div class="cell-top"><svg class="icon"><use href="#i-wave"/></svg><span class="no">06</span></div>
@@ -474,7 +477,22 @@ footer .links { display: flex; gap: 18px; flex: none; }
       <article class="cell">
         <div class="cell-top"><svg class="icon"><use href="#i-tray"/></svg><span class="no">09</span></div>
         <h3>트레이에서 계속 실행</h3>
-        <p>창을 닫으면 알림 영역으로 들어가 녹화 감시만 이어 갑니다. 트레이 메뉴에서 ‘윈도우 시작 시 실행’을 체크하면 로그인 후 자동으로 켜집니다. 감시 폴더와 모니터는 환경설정에서 바꿉니다.</p>
+        <p>창을 닫으면 알림 영역으로 들어가 녹화 감시만 이어 갑니다. 트레이 메뉴에서 ‘윈도우 시작 시 실행’을 체크하면 로그인 후 자동으로 켜지고, ‘최신 버전 확인’으로 새 버전을 받아 그 자리에서 설치합니다.</p>
+      </article>
+      <article class="cell">
+        <div class="cell-top"><svg class="icon"><use href="#i-globe"/></svg><span class="no">10</span></div>
+        <h3>세 가지 말</h3>
+        <p>한국어와 영어, 일본어 가운데 화면에 쓸 말을 고릅니다. 환경설정에서 바꾸면 두 화면과 트레이 메뉴, 모든 팝업이 함께 바뀌고 날짜의 짜임새와 요일 이름도 그 말을 따릅니다.</p>
+      </article>
+      <article class="cell">
+        <div class="cell-top"><svg class="icon"><use href="#i-sync"/></svg><span class="no">11</span></div>
+        <h3>앱에서 업데이트</h3>
+        <p>트레이의 ‘최신 버전 확인’으로 새 정식 버전을 받아 그 자리에서 설치하고 다시 실행합니다. 받은 파일의 SHA-256 을 맞춰 보며, 실패하면 쓰던 버전을 되돌립니다.</p>
+      </article>
+      <article class="cell">
+        <div class="cell-top"><svg class="icon"><use href="#i-bolt"/></svg><span class="no">12</span></div>
+        <h3>빠른 반응</h3>
+        <p>파일이 쓰기로 열려 있는지를 함께 보므로, 녹화를 시작하거나 멈추면 0.5초 안에 화면이 따라옵니다. 크기 증가만 보던 때처럼 몇 초씩 기다리지 않습니다.</p>
       </article>
     </div>
   </div>
@@ -494,7 +512,7 @@ footer .links { display: flex; gap: 18px; flex: none; }
           <img src="wallpaper.png" alt="계절 사진 위에 시계와 날짜, 날씨, 오늘 달, 재생 중인 음악과 파형이 놓인 대기 화면" loading="lazy" width="960" height="640">
           <figcaption><span class="led"></span><span class="mono">Idle</span><span class="right">녹화를 기다리는 동안</span></figcaption>
         </figure>
-        <p class="desc"><b>월페이퍼 화면</b>큰 시계와 날짜, 날씨가 가운데를 차지하고 아래쪽에 지금 듣는 곡과 소리 파형이 놓입니다. 글자는 저마다 놓인 자리의 배경 밝기를 재어 흰색과 검정 가운데 잘 보이는 쪽으로 칠해집니다.</p>
+        <p class="desc"><b>월페이퍼 화면</b>큰 시계와 날짜, 날씨가 가운데를 차지하고 아래쪽에 지금 듣는 곡과 소리 파형이 놓입니다. 글자는 어느 시간대에나 흰색으로 적고, 대신 배경의 밝기를 낮추어 사진이 비쳐 보이면서도 작은 화면에서 읽히게 합니다.</p>
         <div class="keys"><span>Clock</span><span>Weather</span><span>Moon</span><span>Now Playing</span><span>Spectrum</span></div>
       </div>
       <div>
@@ -566,7 +584,7 @@ footer .links { display: flex; gap: 18px; flex: none; }
     <span>ShadowPlay Notifier</span>
     <span>Windows 10 · 11</span>
     <span>MIT License</span>
-    <span class="last" id="ver">v2.3.0</span>
+    <span class="last" id="ver">v2.4.0</span>
   </div>
   <footer>
     <div class="rows">
