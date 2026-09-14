@@ -36,28 +36,32 @@ class Palette:
         self.light, self.glow, self.veil, self.stars = light, _rgb(tint), veil, stars
 
 
-# 심야와 저녁만 색을 뚜렷하게 씁니다. 나머지 시간대는 채도를 낮춘 색을 옅게
-# 덮어 사진 본래의 색이 비치도록 합니다. 짙은 색을 덮으면 사진이 물들어 버립니다.
+# **글자는 어느 시간대에나 흰색입니다.** 보조 디스플레이가 작아서 검은 글자는
+# 대비를 충분히 확보해도 읽기 어렵고 보기에도 좋지 않았습니다. 그래서 시간대의
+# 색을 모두 어둡게 내리고, 그 대신 덮는 정도(``veil``)를 절반 안팎까지 낮춰
+# 계절 사진이 어느 시간대에나 비치도록 했습니다. 예전처럼 밝은 색을 짙게
+# 덮으면 사진이 사라지고 흰 글자도 묻히므로 그 방식으로 되돌리지 마십시오.
 #
-# **밝은 시간대의 veil 을 0.50 아래로 내리지 마십시오.** 사진의 어두운 부분
-# 위에 검은 글자가 얹히면 읽을 수 없게 됩니다. 낮에 색을 아예 빼는 방안을
-# 검토했지만 바로 이 문제로 접었습니다.
+# 한 시간대의 값을 고칠 때는 :func:`_needed_veil` 의 기준을 함께 보십시오.
+# 덮은 뒤 화면에서 가장 밝은 곳의 휘도가 0.155 이하라야 흰 글자가 4.5:1 로
+# 읽힙니다. ``light`` 를 올리려면 그만큼 ``veil`` 도 올려야 합니다.
+#
+# 시간대는 밝기가 아니라 색조로 나뉩니다. 여명과 노을은 따뜻한 갈색, 낮은
+# 하늘의 청회색, 오전과 오후는 금빛, 밤은 남색과 보랏빛입니다. 밤이 낮보다
+# 어두운 것은 ``light`` 를 한도보다 낮춰 두었기 때문입니다.
 #
 # 낮은 12시부터 15시 30분까지 같은 값을 유지하다가 16시 30분을 지나며 노을로
 # 넘어갑니다. 그래서 낮 항목이 두 번 나옵니다.
-# 7시와 19시 항목은 밤과 낮이 뒤바뀌는 순간입니다. 이때는 배경이 중간 밝기라
-# 글자를 읽으려면 많이 덮어야 하므로, 잿빛 대신 여명과 노을의 따뜻한 색을
-# 지나가게 했습니다. 밝은 색일수록 덜 덮어도 되어 사진도 더 남습니다.
 TIMES = (
-    Palette("심야", "MIDNIGHT", 0, .26, "#0a1228", .72, 30),
-    Palette("새벽", "DAWN", 5, .42, "#232c46", .60, 10),
-    Palette("여명", "FIRST LIGHT", 7, .80, "#f2c9a6", .54, 2),
-    Palette("오전", "MORNING", 9, .98, "#ffe3bd", .54, 0),
-    Palette("낮", "DAYLIGHT", 12, 1.12, "#eff9ff", .49, 0),
-    Palette("낮", "DAYLIGHT", 15.5, 1.12, "#eff9ff", .49, 0),
-    Palette("오후", "AFTERNOON", 17.5, 1.00, "#ffdda8", .55, 0),
-    Palette("노을", "SUNSET", 19, .76, "#f6c6a6", .54, 2),
-    Palette("저녁", "EVENING", 20, .50, "#402e46", .64, 8),
+    Palette("심야", "MIDNIGHT", 0, .40, "#0a1228", .56, 30),
+    Palette("새벽", "DAWN", 5, .46, "#232c46", .54, 10),
+    Palette("여명", "FIRST LIGHT", 7, .60, "#4a3226", .50, 2),
+    Palette("오전", "MORNING", 9, .59, "#46402f", .48, 0),
+    Palette("낮", "DAYLIGHT", 12, .59, "#2e404f", .46, 0),
+    Palette("낮", "DAYLIGHT", 15.5, .59, "#2e404f", .46, 0),
+    Palette("오후", "AFTERNOON", 17.5, .60, "#4a3c2b", .48, 0),
+    Palette("노을", "SUNSET", 19, .64, "#4a2e26", .50, 2),
+    Palette("저녁", "EVENING", 20, .50, "#2f2234", .55, 8),
 )
 
 # 화면에 적는 이름입니다. 낮이 두 번 나오므로 시각으로 따로 고릅니다.
@@ -66,6 +70,11 @@ SLOTS = (("심야", "MIDNIGHT"), ("새벽", "DAWN"), ("오전", "MORNING"),
 
 # 녹화 화면입니다. 붉은 표시가 사진에 묻히지 않도록 가장 어둡게 깔아 둡니다.
 REC_GRADE = (.26, (11, 17, 30), .66)
+
+# 화면에서 가장 밝은 곳이 넘어서는 안 되는 휘도입니다. 월페이퍼 글자 가운데
+# 가장 어두운 흰색(:data:`component.wallpaper.WALL_INK_3`)이 이 값 위에서
+# 4.5:1 로 읽힙니다. 글자를 더 어둡게 만들려면 이 값도 함께 내려야 합니다.
+INK_LIMIT = .158
 
 SKIES = {
     "clear": {"fog": 0, "dim": 0, "star_mul": 1},
@@ -81,28 +90,26 @@ def season_for_month(month):
     return ("winter", "spring", "summer", "autumn")[(month % 12) // 3]
 
 
-def _flips(first, second):
-    """밤과 낮이 뒤바뀌는 구간인지 봅니다. 글자 색이 반대로 바뀌는 자리입니다."""
-    return (luminance(first.glow) < .19) != (luminance(second.glow) < .19)
-
-
 @lru_cache(maxsize=512)
 def _needed_veil(light, tint):
-    """글자가 읽히도록 화면을 덮어야 하는 최소한의 정도입니다.
+    """흰 글자가 읽히도록 화면을 덮어야 하는 최소한의 정도입니다.
 
-    사진 한 장에는 새까만 곳과 새하얀 곳이 함께 있습니다. 흰 글자를 쓰려면
-    가장 밝은 곳까지 충분히 어두워야 하고, 검은 글자를 쓰려면 가장 어두운
-    곳까지 충분히 밝아야 합니다. 둘 중 먼저 이루어지는 쪽을 따릅니다.
+    사진 한 장에는 새까만 곳과 새하얀 곳이 함께 있습니다. 글자를 언제나 흰색
+    으로 쓰기로 했으므로, 사진에서 가장 밝은 곳까지 충분히 어두워져야 합니다.
+    휘도 :data:`INK_LIMIT` 는 화면에 쓰는 가장 어두운 흰색이 4.5:1 로 읽히는
+    자리입니다.
 
-    시간대가 바뀌는 동안에는 색이 중간 밝기를 지나므로 이 값이 잠시 커집니다.
-    그 덕분에 색 자체는 서두르지 않고 천천히 물들어 갈 수 있습니다.
+    :data:`TIMES` 의 값은 이 조건을 이미 만족하므로 평소에는 이 함수가 값을
+    올리지 않습니다. 사진을 밝은 것으로 갈아 끼웠을 때를 위한 안전장치입니다.
+
+    예전에는 검은 글자로 바꾸는 길도 열어 두어 밝은 시간대에는 오히려 화면을
+    밝히는 쪽을 골랐습니다. 그 방식은 되살리지 마십시오.
     """
     span = 255 * light
     for step in range(0, 96, 2):
         veil = step / 100
-        dark = luminance(tuple(c * veil for c in tint))
         bright = luminance(tuple(min(255., span * (1 - veil) + c * veil) for c in tint))
-        if bright <= .175 or dark >= .190:
+        if bright <= INK_LIMIT:
             return veil
     return .96
 
@@ -122,10 +129,7 @@ def blend_palette(hour, season=None):
                                 3 if hour < 16 else 4 if hour < 19 else 5]
             # 시작과 끝에서 부드럽게 붙는 곡선입니다. 색은 시간대 내내 천천히
             # 옮겨 가고, 글자를 읽을 수 있게 하는 몫은 veil 이 맡습니다.
-            # 다만 밤과 낮이 뒤바뀌는 구간만은 가운데를 조금 빠르게 지납니다.
-            # 그 중간 밝기에서는 화면을 거의 다 덮어야 글자가 읽히기 때문입니다.
-            g = (.5 + .5 * math.tanh((t - .5) * 6) if _flips(first, second)
-                 else t * t * (3 - 2 * t))
+            g = t * t * (3 - 2 * t)
             light = first.light + (second.light - first.light) * g
             glow = mix(first.glow, second.glow, g)
             veil = first.veil + (second.veil - first.veil) * g
@@ -238,15 +242,21 @@ def luminance(rgb):
     return sum(a * b for a, b in zip(linear, (.2126, .7152, .0722)))
 
 
-def foreground(pixels, box, width, height):
-    """실제 글자 자리의 밝기를 읽어 검정/흰색 중 대비가 큰 쪽을 고릅니다."""
+def contrast(pixels, box, ink, width, height):
+    """글자 자리에서 가장 낮은 대비를 돌려줍니다. 검사에 씁니다.
+
+    화면에 쓰는 색은 이 값을 보고 고르지 않습니다. 글자는 언제나 흰색이며,
+    읽히게 만드는 몫은 시간대의 색과 :func:`_needed_veil` 이 맡습니다.
+    """
     if not box or not pixels:
-        return "#f5f4f2"
-    shades = [luminance(sample(pixels, x / width, y / height))
-              for y in range(box[1], box[3] + 1, max(1, (box[3] - box[1]) // 4))
-              for x in range(box[0], box[2] + 1, max(1, (box[2] - box[0]) // 12))]
-    dark, white = (min(shades) + .05) / .0515, 1.05 / (max(shades) + .05)
-    return "#030508" if dark >= white else "#ffffff"
+        return 21.0
+    light = luminance(ink)
+    worst = 21.0
+    for y in range(box[1], box[3] + 1, max(1, (box[3] - box[1]) // 4)):
+        for x in range(box[0], box[2] + 1, max(1, (box[2] - box[0]) // 12)):
+            ground = luminance(sample(pixels, x / width, y / height))
+            worst = min(worst, (max(light, ground) + .05) / (min(light, ground) + .05))
+    return worst
 
 
 def sample(pixels, x, y):

@@ -12,11 +12,10 @@ monitor.log
 # ShadowPlayNotifier.spec 이 알아서 EXE 아이콘으로 넣습니다.
 *.ico
 
-# 테스트 도구가 남기는 캡처와 측정 결과
-test/shot_*.png
-test/live_*.png
-test/layout_*.txt
-test/monitor_rect.txt
+# 검사와 캡처 도구는 저장소에 올리지 않습니다. 개발할 때만 쓰는 것이라
+# 앱을 내려받아 쓰는 사람에게는 필요하지 않고, 도구가 남기는 그림과 측정
+# 결과까지 따라 들어오기 때문입니다.
+test/
 
 # 로컬 Claude 지침과 기억
 /.[cC][lL][aA][uU][dD][eE]/

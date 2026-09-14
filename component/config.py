@@ -7,6 +7,7 @@ import argparse
 import json
 import os
 
+from . import cities, i18n
 from .paths import CONFIG_PATH, log
 from .scan import DEFAULT_PATTERNS
 
@@ -25,9 +26,16 @@ DEFAULT_CONFIG = {
     "topmost": False,
     "borderless": True,
     "monitor": -1,
-    # 날씨를 볼 곳입니다. 기본값은 서울입니다.
+    # 날씨를 볼 곳입니다. 기본값은 서울입니다. 환경설정에서 도시 이름으로
+    # 고르며, 고른 곳의 좌표가 함께 적힙니다.
+    "city": "Seoul",
     "latitude": 37.5665,
     "longitude": 126.9780,
+    # 화면에 쓰는 말입니다. ko / en / ja 가운데 하나이며 기본은 한국어입니다.
+    "language": "ko",
+    # 시계를 24시간으로 볼지 정합니다. 월페이퍼의 시계를 누르면 바뀌고,
+    # 12시간으로 두면 날짜 줄 아래에 AM/PM 이 함께 나옵니다.
+    "clock_24h": True,
 }
 
 # 월페이퍼 화면을 다시 그리는 빠르기입니다. 기본값으로 충분하므로 설정
@@ -92,6 +100,20 @@ def save_config(values):
     return write_config(merged)
 
 
+def nearest_city_name(latitude, longitude):
+    """좌표에 맞는 도시 이름을 목록에서 찾습니다. 멀면 빈 문자열입니다.
+
+    도시 이름이 없던 때의 ``config.json`` 을 그대로 읽어도 화면에 이름이
+    나오게 하려는 것입니다. 0.25도는 대략 25km 안쪽입니다.
+    """
+    best, gap = "", 0.25
+    for name, _korean, _country, lat, lon in cities.CITIES:
+        span = abs(lat - latitude) + abs(lon - longitude)
+        if span < gap:
+            best, gap = name, span
+    return best
+
+
 def as_list(value):
     if not value:
         return []
@@ -125,8 +147,10 @@ def parse_args(argv):
                     default=None)
     ap.add_argument("--no-topmost", dest="topmost", action="store_false")
     ap.add_argument("--borderless", dest="borderless", action="store_true",
-                    default=None)
-    ap.add_argument("--no-borderless", dest="borderless", action="store_false")
+                    default=None, help=argparse.SUPPRESS)
+    # 예전 바로가기 인자를 계속 읽되 창은 항상 프레임리스로 표시합니다.
+    ap.add_argument("--no-borderless", dest="borderless", action="store_false",
+                    help=argparse.SUPPRESS)
     try:
         return ap.parse_args(argv)
     except SystemExit:
@@ -159,10 +183,19 @@ def build_settings(cfg, args):
         "beep": bool(pick(args.beep, "beep", False)),
         "fast_detect": bool(pick(args.fast_detect, "fast_detect", True)),
         "topmost": bool(pick(args.topmost, "topmost", False)),
-        "borderless": bool(pick(args.borderless, "borderless", True)),
+        "borderless": True,
         "monitor": int(pick(args.monitor, "monitor", -1)),
         "latitude": float(cfg.get("latitude", 37.5665) or 37.5665),
         "longitude": float(cfg.get("longitude", 126.9780) or 126.9780),
+        # 화면에 쓰는 말입니다. 여기에서 정해 두면 뒤에 만드는 창들이 모두
+        # 같은 말로 나옵니다.
+        "language": i18n.set_language(cfg.get("language", i18n.DEFAULT)),
+        "clock_24h": bool(cfg.get("clock_24h", True)),
+        # 화면에 적는 이름입니다. 예전 설정 파일에는 없으므로, 비어 있으면
+        # 좌표에 맞는 도시를 목록에서 찾아 채웁니다.
+        "city": str(cfg.get("city") or "").strip() or nearest_city_name(
+            float(cfg.get("latitude", 37.5665) or 37.5665),
+            float(cfg.get("longitude", 126.9780) or 126.9780)),
         # monitor.log 에 자세한 기록까지 남길지 정합니다. 문제를 찾을 때만 켭니다.
         "verbose_log": bool(cfg.get("verbose_log", False)),
         "wallpaper_fps": max(12, min(40, int(
@@ -185,6 +218,9 @@ def settings_to_config(settings):
         "topmost": settings["topmost"],
         "borderless": settings["borderless"],
         "monitor": settings["monitor"],
+        "city": settings.get("city", ""),
         "latitude": settings["latitude"],
         "longitude": settings["longitude"],
+        "language": settings.get("language", i18n.DEFAULT),
+        "clock_24h": bool(settings.get("clock_24h", True)),
     }

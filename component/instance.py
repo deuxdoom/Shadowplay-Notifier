@@ -19,9 +19,6 @@ MUTEX_NAME = "ShadowPlayNotifier-deuxdoom-single-instance"
 
 _ERROR_ALREADY_EXISTS = 183
 _SW_RESTORE = 9
-_MB_OK = 0x00000000
-_MB_ICONINFORMATION = 0x00000040
-_MB_SETFOREGROUND = 0x00010000
 
 if sys.platform.startswith("win"):
     from ctypes import wintypes
@@ -41,8 +38,6 @@ if sys.platform.startswith("win"):
     _user32.IsIconic.argtypes = [wintypes.HWND]
     _user32.ShowWindow.argtypes = [wintypes.HWND, ctypes.c_int]
     _user32.SetForegroundWindow.argtypes = [wintypes.HWND]
-    _user32.MessageBoxW.argtypes = [wintypes.HWND, wintypes.LPCWSTR,
-                                    wintypes.LPCWSTR, wintypes.UINT]
 else:
     _kernel32 = None
     _user32 = None
@@ -110,6 +105,5 @@ def tell_already_running(title):
     """
     if _user32 is None:
         return
-    _user32.MessageBoxW(
-        None, "이미 실행 중입니다. 보조 디스플레이에 떠 있는 창을 확인하십시오.",
-        title, _MB_OK | _MB_ICONINFORMATION | _MB_SETFOREGROUND)
+    from .dialogs import show_message
+    show_message(title, "이미 실행 중입니다. 보조 디스플레이에 떠 있는 창을 확인하십시오.")

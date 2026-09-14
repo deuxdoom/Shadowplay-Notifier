@@ -6,13 +6,15 @@ ShadowPlay(NVIDIA App) 녹화 상태를 감시해 보조 디스플레이에 표�
 실제 동작은 component 폴더의 모듈들이 나누어 맡습니다.
 """
 
+import os
 import sys
 import tkinter as tk
 import traceback
 import webbrowser
-from tkinter import messagebox
 
-from component import fonts, instance, startup, version
+from component import dialogs, fonts, i18n, instance, startup, version, updater
+from component import update_windows
+from component.update_dialog import UpdateController, run_helper
 from component.app import MonitorApp
 from component.config import build_settings, load_config, parse_args
 from component.display import enable_dpi_awareness, window_position
@@ -36,6 +38,18 @@ def place_window(root, settings):
 def main(argv=None):
     install_excepthook()
     argv = sys.argv[1:] if argv is None else argv
+
+    if len(argv) == 2 and argv[0] == "--apply-update":
+        # 업데이트 진행 창은 본 프로그램과 따로 도는 프로세스이므로, 설정
+        # 파일에서 쓰는 말만 읽어 옵니다. 감시와 창은 열지 않습니다.
+        i18n.set_language(load_config().get("language", i18n.DEFAULT))
+        return run_helper(argv[1])
+    restart_target = os.environ.pop("SPN_UPDATE_RESTART", "")
+    if update_windows.update_active() and (
+            not restart_target or update_windows.canonical(restart_target) !=
+            update_windows.canonical(sys.executable)):
+        update_windows.focus_update()
+        return 0
 
     # 창이 둘 뜨면 같은 폴더를 두 번 감시하면서 로그와 알림음도 겹칩니다.
     if not instance.claim():
@@ -76,12 +90,14 @@ def main(argv=None):
     app.settings_callback = supervisor.start
     tray = None
     closing = False
+    updates = UpdateController(root, argv)
 
     def close(_event=None):
         nonlocal closing
         if closing:
             return
         closing = True
+        updates.close()
         if tray is not None:
             tray.close()
         app.stop_event.set()
@@ -107,13 +123,14 @@ def main(argv=None):
             startup.set_enabled(not startup.is_enabled())
         except (OSError, ValueError) as exc:
             log("[자동 실행] 설정을 바꾸지 못했습니다: %s" % exc)
-            messagebox.showerror("윈도우 시작 시 실행",
+            dialogs.show_message("윈도우 시작 시 실행",
                                  "자동 실행 설정을 바꾸지 못했습니다.\n%s" % exc, parent=root)
 
     tray = TrayIcon(root, {
         "show": app.show_window,
         "settings": settings_from_tray,
         "startup": startup_from_tray,
+        "update": updates.show,
         "github": lambda: webbrowser.open("https://github.com/deuxdoom/Shadowplay-Notifier"),
         "quit": close,
     }, lambda: {"recording": app.recording}, startup.is_enabled)
@@ -131,12 +148,14 @@ def main(argv=None):
         root.after(300, grab_focus)
 
     supervisor.start(settings)
+    updater.schedule_cleanup()
     app.add_log("[시작] 감시를 시작했습니다.", C_MUTED, "", "감시를 시작했습니다")
     log("앱 시작 %s  감시: %s" % (version.VERSION,
                                   " · ".join(settings["dirs"]) or "(없음)"))
     try:
         root.mainloop()
     finally:
+        updates.close()
         tray.close()
         app.stop_event.set()
         supervisor.stop(1.0)

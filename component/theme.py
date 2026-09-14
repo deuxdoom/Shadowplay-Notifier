@@ -39,6 +39,11 @@ MONO_FAMILIES = ("Consolas", "D2Coding", "Courier New")
 # 않습니다. Pretendard JP 는 한글과 일본어를 한 벌로 담고 있습니다.
 WALL_UI_FAMILIES = ("Pretendard JP", "맑은 고딕", "Malgun Gothic", "Segoe UI")
 
+# 월페이퍼에서 글자 사이가 고르게 보여야 하는 자리에만 쓰는 글꼴입니다.
+# 시간대 이름(DAWN, MORNING), NOW PLAYING, 도시 이름, 오른쪽 아래 버전이
+# 여기에 해당합니다. 나머지 글은 WALL_UI_FAMILIES 를 그대로 씁니다.
+WALL_MONO_FAMILIES = ("JetBrains Mono", "Consolas", "Segoe UI")
+
 
 def pick_font(root, families, size, weight="normal"):
     """설치된 글꼴 중 앞에 있는 것을 씁니다. 없으면 마지막 것으로 넘어갑니다."""

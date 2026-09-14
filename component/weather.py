@@ -1,8 +1,8 @@
 """날씨를 받아 오는 일입니다. Open-Meteo 를 씁니다.
 
 API 키가 필요 없고 표준 라이브러리의 ``urllib`` 만으로 부를 수 있습니다.
-기본 위치는 서울이며, ``config.json`` 의 ``latitude`` 와 ``longitude`` 로
-바꿀 수 있습니다.
+기본 위치는 서울입니다. 환경설정에서 도시 이름으로 고르며, 고른 곳의 좌표가
+``config.json`` 의 ``latitude`` 와 ``longitude`` 에 함께 적힙니다.
 
 받아 오지 못해도 앱은 그대로 돌아갑니다. 날씨 자리만 비워 둡니다.
 녹화 중에는 부르지 않습니다.
@@ -20,6 +20,8 @@ from dataclasses import dataclass
 from .paths import detail, log
 
 API_URL = "https://api.open-meteo.com/v1/forecast"
+# 도시 이름을 좌표로 바꾸는 곳입니다. 날씨와 마찬가지로 키가 필요 없습니다.
+GEOCODE_URL = "https://geocoding-api.open-meteo.com/v1/search"
 TIMEOUT = 8.0
 USER_AGENT = "ShadowPlayNotifier"
 
@@ -137,6 +139,39 @@ def fetch(latitude, longitude, context=None):
     except (KeyError, TypeError, IndexError) as exc:
         log("[날씨] 응답을 읽지 못했습니다: %s" % exc)
         return Weather()
+
+
+def geocode(name, limit=8, context=None):
+    """도시 이름의 앞글자로 후보를 찾습니다.
+
+    ``[(이름, 나라, 위도, 경도), ...]`` 를 돌려주며, 받아 오지 못하면 빈
+    목록입니다. 환경설정에서 글자를 칠 때마다 부르므로 실패해도 조용히
+    넘어가고, 대신 :mod:`component.cities` 의 목록이 후보를 채웁니다.
+    """
+    text = (name or "").strip()
+    if len(text) < 2:
+        return []
+    query = urllib.parse.urlencode({
+        "name": text, "count": max(1, min(20, limit)),
+        "language": "en", "format": "json",
+    })
+    request = urllib.request.Request(GEOCODE_URL + "?" + query,
+                                     headers={"User-Agent": USER_AGENT})
+    try:
+        with urllib.request.urlopen(request, timeout=TIMEOUT,
+                                    context=context) as resp:
+            body = json.loads(resp.read().decode("utf-8"))
+    except (urllib.error.URLError, ValueError, OSError, TimeoutError) as exc:
+        detail("[날씨] 도시를 찾지 못했습니다: %s" % exc)
+        return []
+    found = []
+    for row in (body.get("results") or []):
+        try:
+            found.append((str(row["name"]), str(row.get("country") or ""),
+                          float(row["latitude"]), float(row["longitude"])))
+        except (KeyError, TypeError, ValueError):
+            continue
+    return found
 
 
 class WeatherWatch(threading.Thread):

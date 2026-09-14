@@ -13,9 +13,11 @@ import tkinter as tk
 import traceback
 from collections import deque
 
-from . import icons, version
+from . import i18n, icons, version
 from .audio import AudioLevels
+from .config import save_config, settings_to_config
 from .display import monitor_for_point, window_position
+from .i18n import tr
 from .nowplaying import NowPlaying
 from .wallpaper import WallpaperView
 from .weather import WeatherWatch
@@ -466,12 +468,18 @@ class MonitorApp:
                     self._set_window_rect(spot[0], spot[1], WIN_W, WIN_H)
         except tk.TclError as exc:
             log("[표시] 창 설정을 적용하지 못했습니다: %s" % exc)
+        # 화면에 쓰는 말이 바뀌면 이미 적어 둔 글자까지 새 말로 갈아 끼웁니다.
+        # 트레이 메뉴는 열 때마다 새로 만들므로 따로 손대지 않아도 됩니다.
+        if settings.get("language") != previous.get("language"):
+            i18n.set_language(settings.get("language"))
+            if self.wallpaper is not None:
+                self.wallpaper.refresh_language()
         self.add_log("[설정] 환경설정을 저장하고 감시를 다시 시작했습니다.", C_SKY)
         self._refresh_status()
         if self.settings_callback:
             self.settings_callback(settings)
         if any(settings.get(key) != previous.get(key) for key in
-               ("latitude", "longitude", "wallpaper_fps")):
+               ("city", "latitude", "longitude", "wallpaper_fps")):
             self._leave_wallpaper()
             self._sync_view()
 
@@ -495,7 +503,13 @@ class MonitorApp:
                 self.root.winfo_height() if self.root.winfo_height() > 1 else WIN_H,
                 actions={"settings": self.open_settings,
                          "full": self.toggle_fullscreen,
+                         "clock": self._clock_changed,
                          "close": lambda: self.close_callback() if self.close_callback else None})
+
+    def _clock_changed(self, use_24h):
+        """시계를 눌러 바꾼 24시간·12시간 표시를 설정 파일에 남깁니다."""
+        self.settings["clock_24h"] = bool(use_24h)
+        save_config(settings_to_config(self.settings))
 
     def _sync_view(self):
         """지금 보여야 할 화면을 정합니다.
@@ -560,8 +574,8 @@ class MonitorApp:
         """녹화 화면 맨 아래 줄입니다."""
         if self.wallpaper is None:
             return
-        shown = _short_path(self.dirs[0]) if self.dirs else "(감시 폴더 없음)"
-        text = "감시 %s   ·   주기 %.1f초   ·   갱신 %s   ·   세션 누적 %d회" % (
+        shown = _short_path(self.dirs[0]) if self.dirs else tr("(감시 폴더 없음)")
+        text = tr("감시 %s   ·   주기 %.1f초   ·   갱신 %s   ·   세션 누적 %d회") % (
             shown, self.interval, self.last_update, self.session_count)
         if self.warning:
             text += "   ·   " + self.warning
@@ -665,8 +679,8 @@ class MonitorApp:
             self.wallpaper.show_recording(
                 folder_label(path, self.dirs), hms(event["elapsed"]),
                 human(event["size"]),
-                "%.1f Mbps" % mbps if mbps else "측정 중",
-                "%.1f초 전 증가" % since, os.path.basename(path))
+                "%.1f Mbps" % mbps if mbps else tr("측정 중"),
+                tr("%.1f초 전 증가") % since, os.path.basename(path))
             self._refresh_wall_status()
 
     def add_log(self, text, color, kind="", detail=""):
@@ -709,7 +723,7 @@ class MonitorApp:
                 relative_path(event.get("path", ""), self.dirs),
                 event.get("reason", ""), hms(event["dur"]),
                 human(event["peak"])), C_SKY, "중단",
-                "%s · %s · %s" % (event.get("reason", ""), hms(event["dur"]),
+                "%s · %s · %s" % (tr(event.get("reason", "")), hms(event["dur"]),
                                   human(event["peak"])))
             self.last_record = {"name": name, "dur": event["dur"],
                                 "peak": event["peak"],

@@ -9,6 +9,7 @@ import os
 from collections import deque
 from ctypes import wintypes as w
 
+from .i18n import tr
 from .paths import RESOURCE_DIR, log
 
 WINDOW_CLASS = "ShadowPlayNotifier.Tray"
@@ -73,7 +74,7 @@ _api(shell32, "Shell_NotifyIconW", [w.DWORD, ctypes.POINTER(NOTIFYICONDATA)], w.
 
 
 class TrayIcon:
-    COMMANDS = {1: "show", 5: "settings", 8: "startup", 6: "github", 7: "quit"}
+    COMMANDS = {1: "show", 5: "settings", 8: "startup", 9: "update", 6: "github", 7: "quit"}
 
     def __init__(self, root, actions, state, startup_state=None):
         self.root, self.actions, self.state = root, actions, state
@@ -168,11 +169,12 @@ class TrayIcon:
 
     def menu_entries(self):
         return [(0, "ShadowPlay Notifier", 2), (0, "", 0x800),
-                (1, "창 열기", 0),
-                (5, "환경설정", 0),
-                (8, "윈도우 시작 시 실행", 8 if self.startup_state() else 0),
-                (6, "GitHub 프로젝트", 0),
-                (0, "", 0x800), (7, "프로그램 종료", 0)]
+                (1, tr("창 열기"), 0),
+                (5, tr("환경설정"), 0),
+                (8, tr("윈도우 시작 시 실행"), 8 if self.startup_state() else 0),
+                (9, tr("최신 버전 확인"), 0),
+                (6, tr("GitHub 프로젝트"), 0),
+                (0, "", 0x800), (7, tr("프로그램 종료"), 0)]
 
     def _show_menu(self):
         menu = user32.CreatePopupMenu()
@@ -193,7 +195,8 @@ class TrayIcon:
 
     def _update_tip(self):
         state = self.state()
-        tip = "ShadowPlay Notifier · " + ("녹화 중" if state.get("recording") else "녹화 대기")
+        tip = "ShadowPlay Notifier · " + tr(
+            "녹화 중" if state.get("recording") else "녹화 대기")
         if tip != self._tip:
             self._tip = tip
             self._data.szTip = tip
