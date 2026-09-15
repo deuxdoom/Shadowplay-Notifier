@@ -1,18 +1,17 @@
-"""창 크기와 색, 글꼴을 한곳에 모아 둡니다."""
+"""창 크기와 색, 글꼴을 한곳에 모아 둡니다.
+
+월페이퍼 화면과 녹화 화면이 함께 쓰는 값만 여기에 둡니다. 한쪽 화면에서만
+쓰는 자리와 색은 그 화면을 맡은 모듈이 직접 들고 있습니다.
+"""
 
 from tkinter import font as tkfont
 
 WIN_W, WIN_H = 960, 640
 
-# 960x640 에서 실측한 기준 높이입니다. 전체화면에서는 app._resize_layout 이
-# 창 높이에 비례해 모든 영역을 함께 확대하며, 글자와 아이콘도 같은 기준으로 키웁니다.
-# 멀리서 판단하는 화면이므로 녹화 정보에 자리를 몰아주고 로그는 최근 것만 남깁니다.
-H_BANNER = 140
-H_DETAIL = 319
-H_LOG = 133
-LOG_ROWS = 5
-# 저장 폴더 값이 들어갈 수 있는 가로 폭입니다. 이름이 길면 글자를 줄여서 맞춥니다.
-FOLDER_MAX_PX = 436
+# 캔버스 위에 얹는 글자의 기본 밝기입니다. 녹화 화면의 값과 파일 이름처럼
+# 흰색보다 한 단계씩 가라앉혀야 하는 자리에 씁니다. 월페이퍼 화면의 글자는
+# 어느 시간대에나 흰색이며, 그 값은 ``component/wallpaper.py`` 에 있습니다.
+INK, INK_2, INK_3 = "#f1f2f3", "#bdc5ce", "#c6d0dc"
 
 C_BG = "#0d0d0f"
 C_PANEL = "#16161a"
@@ -21,27 +20,20 @@ C_LINE = "#33333a"
 C_FG = "#f2f2f5"
 C_DIM = "#d6d6dc"
 C_MUTED = "#8a8a93"
-C_REC = "#e03131"
-C_REC_DIM = "#8f1f1f"
 C_REC_TEXT = "#ff6b6b"
-C_IDLE = "#3a3a3f"
-C_IDLE_DOT = "#6a6a72"
-C_WARN = "#f59f00"
 C_SKY = "#74c0fc"
-C_YELLOW = "#ffd43b"
 
 UI_FAMILIES = ("맑은 고딕", "Malgun Gothic", "Segoe UI", "Consolas")
 MONO_FAMILIES = ("Consolas", "D2Coding", "Courier New")
 
-# 월페이퍼 화면에만 쓰는 글꼴입니다. ``component/fonts.py`` 가 함께 묶어 온
+# 캔버스 화면에 쓰는 글꼴입니다. ``component/fonts.py`` 가 함께 묶어 온
 # 파일을 이 프로그램에서만 쓰도록 등록하며, 없으면 뒤의 것으로 넘어갑니다.
-# 녹화 화면은 맑은 고딕으로 실측해 둔 배치를 그대로 지켜야 하므로 건드리지
-# 않습니다. Pretendard JP 는 한글과 일본어를 한 벌로 담고 있습니다.
+# Pretendard JP 는 한글과 일본어를 한 벌로 담고 있습니다.
 WALL_UI_FAMILIES = ("Pretendard JP", "맑은 고딕", "Malgun Gothic", "Segoe UI")
 
-# 월페이퍼에서 글자 사이가 고르게 보여야 하는 자리에만 쓰는 글꼴입니다.
-# 시간대 이름(DAWN, MORNING), NOW PLAYING, 도시 이름, 오른쪽 아래 버전이
-# 여기에 해당합니다. 나머지 글은 WALL_UI_FAMILIES 를 그대로 씁니다.
+# 글자 사이가 고르게 보여야 하는 자리에만 쓰는 글꼴입니다. 시간대 이름(DAWN,
+# MORNING), NOW PLAYING, 도시 이름, 오른쪽 아래 버전이 여기에 해당합니다.
+# 나머지 글은 WALL_UI_FAMILIES 를 그대로 씁니다.
 WALL_MONO_FAMILIES = ("JetBrains Mono", "Consolas", "Segoe UI")
 
 
@@ -54,19 +46,34 @@ def pick_font(root, families, size, weight="normal"):
     return tkfont.Font(family=families[-1], size=size, weight=weight)
 
 
-def mix(color_a, color_b, t):
-    """두 색을 t(0~1) 비율로 섞습니다. 배너 밝기 펄스에 씁니다."""
-    t = max(0.0, min(1.0, t))
-    a = (int(color_a[1:3], 16), int(color_a[3:5], 16), int(color_a[5:7], 16))
-    b = (int(color_b[1:3], 16), int(color_b[3:5], 16), int(color_b[5:7], 16))
-    return "#%02x%02x%02x" % tuple(
-        int(round(a[i] + (b[i] - a[i]) * t)) for i in range(3))
+def pick_family(root, families=UI_FAMILIES):
+    """설치된 글꼴의 이름만 골라 돌려줍니다.
+
+    ``("맑은 고딕", -14)`` 처럼 튜플로 글꼴을 넘기는 자리에 씁니다. 튜플은
+    :class:`tkinter.font.Font` 객체와 달리 참조를 붙들어 둘 필요가 없어서,
+    잠깐 떴다 사라지는 팝업에서 다루기 쉽습니다. 이름을 코드에 그대로 적으면
+    그 글꼴이 없는 윈도우에서 Tk 가 말없이 다른 글꼴로 바꿔 그립니다.
+    """
+    available = set(tkfont.families(root))
+    for name in families:
+        if name in available:
+            return name
+    return families[-1]
 
 
-def growth_color(seconds, stall):
-    """마지막 증가가 오래될수록 눈에 띄는 색으로 바꿉니다."""
-    if seconds >= max(3.0, stall * 0.75):
-        return C_REC_TEXT
-    if seconds > 3.0:
-        return C_WARN
-    return C_FG
+def round_rect(x, y, width, height, radius):
+    """모서리가 둥근 사각형의 꼭짓점입니다. 앨범 커버 받침과 녹화 표시등에 씁니다.
+
+    폭과 높이에서 1 을 빼는 것이 중요합니다. 캔버스의 좌표는 픽셀의 인덱스라서
+    ``x`` 에서 ``x + width`` 까지를 주면 실제로 칠해지는 것은 ``x`` 부터
+    ``x + width - 1`` 까지입니다. 그대로 두면 오른쪽과 아래의 제어점만 마지막
+    픽셀보다 하나 바깥에 놓여 그쪽 모서리가 덜 깎입니다. 실제로 재 보니 왼쪽
+    위는 4px, 오른쪽 아래는 2px 만 깎여서 같은 사각형인데도 왼쪽이 더 둥글어
+    보였습니다. 1 을 빼면 네 귀퉁이가 똑같아집니다.
+    """
+    r = radius
+    width, height = width - 1, height - 1
+    return (x + r, y, x + width - r, y, x + width, y, x + width, y + r,
+            x + width, y + height - r, x + width, y + height,
+            x + width - r, y + height, x + r, y + height, x, y + height,
+            x, y + height - r, x, y + r, x, y)

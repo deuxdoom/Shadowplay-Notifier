@@ -14,8 +14,10 @@ from .atmosphere import Atmosphere
 from .audio import BARS
 from .i18n import date_text, tr, weekday, weekday_leads
 from .paths import log
+from .recording_view import STATUS_Y, RecordingLayer
 from .text import fit_text
-from .theme import WALL_MONO_FAMILIES, WALL_UI_FAMILIES, pick_font
+from .theme import (INK, INK_3, WALL_MONO_FAMILIES, WALL_UI_FAMILIES,
+                    pick_font, round_rect)
 
 BASE_W, BASE_H = 960, 640
 COVER_SIZE = 112
@@ -23,7 +25,6 @@ WICON_SIZE = 128
 SPECTRUM_BARS = 64
 # 보조 정보 왼쪽에 놓는 달의 지름입니다.
 MOON_SIZE = 70
-INK, INK_2, INK_3 = "#f1f2f3", "#bdc5ce", "#c6d0dc"
 # 월페이퍼 글자입니다. **어느 시간대에나 흰색으로 씁니다.** 보조 디스플레이가
 # 작아서 배경이 밝을 때 검은 글자로 바꾸면 대비를 맞추어도 읽기 어려웠습니다.
 # 그래서 글자의 위계는 밝기가 아니라 크기와 굵기로만 나타냅니다. 셋 다
@@ -34,19 +35,8 @@ RAINBOW = tuple(sky._rgb(c) for c in (
     "#ff6f91", "#ffae68", "#ffe78b", "#a4ed9b", "#63dfd7",
     "#6dbdfc", "#a99aff", "#e28fdf"))
 
-# 녹화 화면. 월페이퍼와 같은 골격을 쓰되 내용만 갈아 끼웁니다.
-# 큰 숫자는 시계와 같은 높이에 두어 전환이 이어져 보이게 합니다.
-REC_LABEL_Y, REC_FOLDER_Y, REC_BIG_Y = 58, 116, 248
-REC_RATE_Y, REC_GROW_Y, REC_FILE_Y = 318, 358, 392
-REC_BOTTOM_Y, BADGE_SIZE, LOG_GAP = 452, 112, 36
-STATUS_Y = 602
-# 녹화 표시는 흐려지면 안 되므로 밝기를 낮추는 대신 더 밝은 쪽으로 흔듭니다.
-REC_RED, REC_RED_LIT = "#ff4d4d", "#ff9090"
-REC_TIME_INK = "#ff6b6b"
-REC_BADGE_BG, REC_BADGE_EDGE = "#bf2a2a", "#ff9b9b"
-LOG_TIME_INK, STATUS_INK = "#8a94a6", "#77839a"
-LOG_START_INK, LOG_STOP_INK = "#ff8080", "#7cc4f7"
-REC_NUMERIC_FAMILIES = ("Segoe UI Light", "Segoe UI", "Pretendard JP", "Arial")
+# 녹화 화면은 :mod:`component.recording_view` 가 같은 캔버스 위에 그립니다.
+# 자리와 색은 그쪽에 모아 두었고, 여기에서는 화면을 갈아 끼우는 일만 맡습니다.
 # Pretendard 숫자가 글자 상자 왼쪽에 두는 여백입니다. 글꼴 크기에 대한 비율이며,
 # 시계를 날짜와 왼쪽 정렬할 때 이만큼 빼 줍니다.
 BEARING = 0.061
@@ -108,6 +98,14 @@ DESC_Y, META_Y, META2_Y, MOON_Y = 288, 326, 358, 342
 CLOCK_INK = (187.5, 309.5, 60.5)
 WEATHER_INK = (120.5, 377.5, 85.5)
 
+# 날씨 묶음만 빈 자리의 한가운데에서 이만큼 위로 올립니다. 도시 이름부터 달까지
+# 아래로 길게 늘어서는 묶음이라, 자로 잰 가운데에 두면 눈에는 살짝 내려앉은
+# 것처럼 보입니다. 사용자가 보고 정한 값입니다. 위로는 날짜 줄과의 사이가,
+# 아래로는 소리 막대와의 사이가 좁아지므로 더 키우지 마십시오. 5px 일 때 위로
+# 8px, 아래로 7.5px 이 남아 양쪽이 거의 균형을 이룹니다. 8px 을 넘기면 도시
+# 이름이 날짜 줄과 같은 높이로 올라와 한 줄처럼 보입니다.
+WEATHER_LIFT = 5
+
 
 class WallpaperView:
     def __init__(self, parent, settings, width=BASE_W, height=BASE_H, actions=None):
@@ -138,8 +136,7 @@ class WallpaperView:
         self._clock_blink_on = True
         self._clock_blink_ink = {}
         self._fonts = {}
-        self._cover_data = None
-        self._cover_render_key = None
+        self._cover_data, self._cover_side = None, None
         self._track_text = (tr("고요한 순간"), tr("음악을 재생하면 이곳에 표시됩니다"))
         self._track_fade = None
         self._has_track = False
@@ -266,7 +263,14 @@ class WallpaperView:
         for item in (self.cover_mat, *self.record_items, self.record_center,
                      self.cover_item):
             c.tag_raise(item)
-        self._build_recording()
+        # 녹화 화면은 따로 떼어 둔 켜가 같은 캔버스 위에 그립니다. 월페이퍼
+        # 도형을 모두 만든 뒤에 세워야 배경 위, 안내 글 아래에 놓입니다.
+        self.recording = RecordingLayer(c, self.parent)
+        # 오른쪽 아래 버전은 두 화면에 모두 남으므로 어느 꼬리표도 달지 않습니다.
+        self.status_ver = self._text(self._font("statusver", -16,
+                                                WALL_MONO_FAMILIES), "#5a6478",
+                                     text=version.label(), anchor="e")
+        self._tag_wallonly()
         self.tooltip = self._text(self._font("tooltip", -13), WALL_INK_2,
                                   anchor="e", tag="controls")
         c.itemconfigure("controls", state="hidden")
@@ -283,51 +287,9 @@ class WallpaperView:
         self._pressed_control = False
         self._pressed_clock = None
 
-    def _build_recording(self):
-        """녹화 화면에 쓰는 도형입니다. 만들어 두고 숨겨 놓습니다."""
+    def _tag_wallonly(self):
+        """월페이퍼에서만 보이는 것들을 한데 묶어 둡니다."""
         c = self.canvas
-        self.rec_dot = c.create_oval(0, 0, 0, 0, outline="", fill=REC_RED,
-                                     tags="reconly")
-        self.rec_word = self._text(self._font("recword", -26, weight="bold"),
-                                   REC_RED, tag="reconly")
-        self.rec_folder = self._text(self._font("recfolder", -40), INK,
-                                     tag="reconly")
-        f_time = self._font("rectime", -148, REC_NUMERIC_FAMILIES)
-        self.rec_time_shadow = self._text(f_time, "#080b12", tag="reconly")
-        self.rec_time = self._text(f_time, REC_TIME_INK, tag="reconly")
-        self.rec_size = self._text(self._font("recsize", -88, REC_NUMERIC_FAMILIES),
-                                   INK, anchor="e", tag="reconly")
-        self.rec_unit = self._text(self._font("recunit", -34), INK_3,
-                                   anchor="e", tag="reconly")
-        self.rec_rate = self._text(self._font("recrate", -30), INK_2,
-                                   anchor="e", tag="reconly")
-        self.rec_grow = self._text(self._font("recgrow", -22), INK_3,
-                                   anchor="e", tag="reconly")
-        self.rec_file = self._text(self._font("recfile", -19), "#7d879a",
-                                   anchor="e", tag="reconly")
-
-        # 왼쪽 아래 표시등. 앨범 커버가 있던 자리를 그대로 씁니다.
-        self.badge_mat = c.create_polygon(0, 0, 0, 0, fill=REC_BADGE_BG,
-                                          outline=REC_BADGE_EDGE, smooth=True,
-                                          splinesteps=24, tags="reconly")
-        self.badge_ring = c.create_oval(0, 0, 0, 0, outline="", fill="#ffffff",
-                                        tags="reconly")
-        self.badge_word = self._text(self._font("badge", -15, weight="bold"),
-                                     "#ffffff", anchor="center", tag="reconly")
-
-        self.log_label = self._text(self._font("loglabel", -14), INK_3,
-                                    "E V E N T   L O G", tag="reconly")
-        f_log = self._font("logrow", -20)
-        self.log_items = [self._text(f_log, INK_2, tag="reconly")
-                          for _ in range(3)]
-        self.status_item = self._text(self._font("status", -18), STATUS_INK,
-                                      tag="reconly")
-        self.status_ver = self._text(self._font("statusver", -16,
-                                                WALL_MONO_FAMILIES), "#5a6478",
-                                     text=version.label(), anchor="e")
-        c.itemconfigure("reconly", state="hidden")
-
-        # 월페이퍼에서만 보이는 것들을 한데 묶어 둡니다.
         for item in (self.phase_item, self.date_item, self.dow_item,
                      self.ampm_item, self.clock_item,
                      self.clock_shadow,
@@ -367,7 +329,7 @@ class WallpaperView:
         # 섭니다. 두 묶음의 가운데가 같은 높이에 놓이도록 각각 옮깁니다.
         band = self._band()
         self._clock_y = self._center_of(band, CLOCK_INK)
-        weather_y = self._center_of(band, WEATHER_INK)
+        weather_y = self._center_of(band, WEATHER_INK) - WEATHER_LIFT * s
         self._weather_shift = weather_y - WEATHER_Y * sy
         # 시계가 쓸 수 있는 폭은 가장 넓은 기온을 기준으로 고정해 둡니다.
         # 아이콘이 짧은 기온을 따라 오른쪽으로 당겨져도 시계 크기는 그대로입니다.
@@ -384,7 +346,7 @@ class WallpaperView:
         c.coords(self.meta2_item, right, META2_Y * sy + self._weather_shift)
         cx, cy = self._cover_xy
         side = COVER_SIZE * s
-        c.coords(self.cover_mat, *_round_rect(cx, cy, side, side, 15 * s))
+        c.coords(self.cover_mat, *round_rect(cx, cy, side, side, 15 * s))
         c.coords(self.cover_item, cx, cy)
         for i, item in enumerate(self.record_items):
             r = (39 - i * 6) * s
@@ -475,7 +437,7 @@ class WallpaperView:
 
     def _place_clock(self):
         """시계를 날짜와 왼쪽 정렬하고, 초는 그 오른쪽에 베이스라인을 맞춰 둡니다."""
-        c, s, sy = self.canvas, self.scale, self.scale_y
+        c, s = self.canvas, self.scale
         font, base = self._fonts["clock"]
         sec_font = self._fonts["sec"][0]
         size = max(8, round(-base * s))
@@ -610,49 +572,10 @@ class WallpaperView:
                            top - 6 * s - font.metrics("linespace") / 2)
 
     def _place_recording(self):
-        """녹화 화면의 자리입니다. 월페이퍼와 같은 여백을 씁니다."""
-        c, sx, sy, s = self.canvas, self.scale_x, self.scale_y, self.scale
-        x, right = 60 * sx, self.width - 60 * sx
-        radius = 11 * s
-        cy = REC_LABEL_Y * sy
-        c.coords(self.rec_dot, x + radius - radius, cy - radius,
-                 x + radius * 2, cy + radius)
-        c.coords(self.rec_word, x + 36 * s, cy)
-        c.coords(self.rec_folder, x, REC_FOLDER_Y * sy)
-        c.coords(self.rec_time, x - 8 * s, REC_BIG_Y * sy)
-        c.coords(self.rec_time_shadow, x - 8 * s + s, REC_BIG_Y * sy + 2 * s)
-        c.coords(self.rec_unit, right, (REC_BIG_Y + 22) * sy)
-        c.coords(self.rec_rate, right, REC_RATE_Y * sy)
-        c.coords(self.rec_grow, right, REC_GROW_Y * sy)
-        c.coords(self.rec_file, right, REC_FILE_Y * sy)
-        self._place_size_value()
-
-        side = BADGE_SIZE * s
-        top = REC_BOTTOM_Y * sy
-        c.coords(self.badge_mat, *_round_rect(x, top, side, side, 15 * s))
-        ring = 17 * s
-        c.coords(self.badge_ring, x + side / 2 - ring, top + side / 2 - ring - 8 * s,
-                 x + side / 2 + ring, top + side / 2 + ring - 8 * s)
-        c.coords(self.badge_word, x + side / 2, top + side / 2 + 30 * s)
-
-        log_x = x + (BADGE_SIZE + 30) * s
-        c.coords(self.log_label, log_x, (REC_BOTTOM_Y + 10) * sy)
-        for i, item in enumerate(self.log_items):
-            c.coords(item, log_x, (REC_BOTTOM_Y + 44 + i * LOG_GAP) * sy)
-        c.coords(self.status_item, x, STATUS_Y * sy)
-        c.coords(self.status_ver, right, STATUS_Y * sy)
-
-    def _place_size_value(self):
-        """용량 숫자를 단위 왼쪽에 붙여 놓습니다."""
-        right = self.width - 60 * self.scale_x
-        try:
-            box = self.canvas.bbox(self.rec_unit)
-        except tk.TclError:
-            box = None
-        gap = 10 * self.scale
-        edge = (box[0] - gap) if box else (right - 60 * self.scale)
-        self.canvas.coords(self.rec_size, edge, REC_BIG_Y * self.scale_y)
-
+        """녹화 켜에 지금 창 크기를 알려 주고, 두 화면이 함께 쓰는 것만 놓습니다."""
+        self.recording.place(self.width, self.scale_x, self.scale_y, self.scale)
+        self.canvas.coords(self.status_ver, self.width - 60 * self.scale_x,
+                           STATUS_Y * self.scale_y)
 
     # ------------------------------------------------------------ 화면 갈아 끼우기
 
@@ -676,89 +599,34 @@ class WallpaperView:
         # 별·비·눈은 월페이퍼에서만 움직입니다. 녹화 중에는 쉬게 둡니다.
         c.itemconfigure("atmosphere", state="hidden")
         if wall:
+            # ``wallonly`` 가 방금 모두 되살렸으므로, 커버가 있을 때 감춰 두던
+            # 받침을 다시 감춥니다.
+            self._show_cover_backdrop()
             if self._bg_pixels is not None:
                 self.atmosphere.configure(self.width, self.height, self._palette,
                                           self._sky_key, self._bg_pixels,
                                           time.perf_counter())
         else:
-            self._paint_recording()
+            self.recording.paint()
         self._bake_sky()
-
-    def _paint_recording(self):
-        """녹화 화면의 고대비 색과 문구를 칠합니다."""
-        c = self.canvas
-        c.itemconfigure(self.rec_word, text="R E C O R D I N G", fill=REC_RED)
-        c.itemconfigure(self.rec_dot, fill=REC_RED)
-        c.itemconfigure(self.rec_time, fill=REC_TIME_INK)
-        c.itemconfigure(self.badge_mat, fill=REC_BADGE_BG, outline=REC_BADGE_EDGE)
-        c.itemconfigure(self.badge_ring, fill="#ffffff")
-        c.itemconfigure(self.badge_word, text="R E C", fill="#ffffff")
-        c.itemconfigure(self.rec_size, fill=INK)
-        c.itemconfigure(self.rec_rate, fill=INK_2)
 
     def show_recording(self, folder, elapsed, size, rate, growth, filename):
         """녹화 중일 때 채웁니다. 값은 이미 다듬은 문자열입니다."""
-        c = self.canvas
-        c.itemconfigure(self.rec_folder,
-                        text=fit_text(folder, self._fonts["recfolder"][0],
-                                      int(self.width * 0.42)))
-        for item in (self.rec_time, self.rec_time_shadow):
-            c.itemconfigure(item, text=elapsed)
-        number, _, unit = size.partition(" ")
-        c.itemconfigure(self.rec_unit, text=unit)
-        c.itemconfigure(self.rec_size, text=number)
-        self._place_size_value()
-        c.itemconfigure(self.rec_rate, text=rate)
-        c.itemconfigure(self.rec_grow, text=growth)
-        c.itemconfigure(self.rec_file,
-                        text=fit_text(filename, self._fonts["recfile"][0],
-                                      int(self.width * 0.46)))
+        self.recording.show(folder, elapsed, size, rate, growth, filename)
 
     def set_log(self, rows):
-        """이벤트 로그를 세 줄까지 적습니다. rows 는 (시각, 종류, 내용) 입니다."""
-        font = self._fonts["logrow"][0]
-        room = int(self.width - (60 + BADGE_SIZE + 30) * self.scale
-                   - 60 * self.scale_x)
-        for i, item in enumerate(self.log_items):
-            if i >= len(rows):
-                self.canvas.itemconfigure(item, text="")
-                continue
-            stamp, kind, text = rows[i]
-            # ``kind`` 는 색을 고르는 이름이므로 한국어 원문으로 받고, 화면에
-            # 적을 때에만 쓰는 말로 옮깁니다.
-            color = (LOG_START_INK if kind == "시작" else
-                     LOG_STOP_INK if kind == "중단" else INK_3)
-            line = "%s   %s   %s" % (stamp, tr(kind), text) if kind else \
-                   "%s   %s" % (stamp, text)
-            self.canvas.itemconfigure(item, text=fit_text(line, font, room),
-                                      fill=color if kind else INK_3)
+        """이벤트 로그입니다. rows 는 (시각, 종류, 내용) 입니다."""
+        self.recording.set_log(rows)
 
-    def set_status(self, text, version=""):
-        """맨 아래 한 줄입니다. 감시 폴더와 주기, 갱신 시각, 세션 누적을 적습니다."""
-        font = self._fonts["status"][0]
-        room = int(self.width - 120 * self.scale_x - 90 * self.scale)
-        self.canvas.itemconfigure(self.status_item, text=fit_text(text, font, room))
-        self.canvas.itemconfigure(self.status_ver, text=version)
+    def set_status(self, text, label=""):
+        """맨 아래 한 줄입니다.
 
-    def _pulse_recording(self, now):
-        """녹화 표시의 맥박입니다.
-
-        흐려지면 안 되므로 어두워지는 대신 더 밝은 쪽으로만 흔듭니다.
-        크기도 함께 키워서 멀리서도 켜져 있는 것이 보입니다.
+        ``label`` 은 오른쪽 끝에 적는 버전 문구이며 두 화면에 모두 남습니다.
+        이름을 ``version`` 으로 두면 모듈 :mod:`component.version` 을 가리므로
+        쓰지 않습니다.
         """
-        k = 0.5 - 0.5 * math.cos(now * 2 * math.pi)
-        color = sky.to_hex(sky.mix(sky._rgb(REC_RED), sky._rgb(REC_RED_LIT), k))
-        self.canvas.itemconfigure(self.rec_dot, fill=color)
-        s, sx, sy = self.scale, self.scale_x, self.scale_y
-        x = 60 * sx
-        radius = (11 + 1.4 * k) * s
-        cy = REC_LABEL_Y * sy
-        self.canvas.coords(self.rec_dot, x, cy - radius, x + radius * 2, cy + radius)
-        ring = (17 + 2.2 * k) * s
-        cx = x + BADGE_SIZE * s / 2
-        top = REC_BOTTOM_Y * sy + BADGE_SIZE * s / 2 - 8 * s
-        self.canvas.coords(self.badge_ring, cx - ring, top - ring,
-                           cx + ring, top + ring)
+        self.recording.set_status(text)
+        self.canvas.itemconfigure(self.status_ver, text=label)
 
     def set_sources(self, audio=None, nowplaying=None, weather=None):
         """자료를 대는 스레드를 갈아 끼웁니다.
@@ -817,6 +685,7 @@ class WallpaperView:
         self._moon_slot = None
         self._bg_pixels = self._fade_source = self._fade_target = None
         self._cover_data = self._wanted = self._future = None
+        self._cover_side = None
         self.canvas.destroy()
 
     def resize(self, width, height):
@@ -837,23 +706,23 @@ class WallpaperView:
         now = time.perf_counter()
         palette = sky.blend_palette(_now_hour())
         palette["recording"] = self._mode == "rec"
-        phase = 0
         key = (self.width, self.height, tuple(palette["sky"]), palette["glow"],
-               self._sky_key, self._accent, phase, palette["season"],
+               self._sky_key, self._accent, palette["season"],
                round(palette["light"], 4), round(palette["veil"], 4), self._mode)
         self._baked_at = now
         if not force and key == self._bake_key:
             return
         self._bake_key = key
-        self._wanted = (key, palette, phase * .12)
+        self._wanted = (key, palette, self.width, self.height,
+                        self._accent, self._sky_key)
         self._submit_sky()
 
     def _submit_sky(self):
         if self._future is not None or self._wanted is None:
             return
-        key, palette, phase = self._wanted
+        key, palette, width, height, accent, group = self._wanted
         self._future = (key, palette, self._executor.submit(
-            sky.render, key[0], key[1], palette, key[5], key[4], phase))
+            sky.render, width, height, palette, accent, group))
 
     def _poll_sky(self, now):
         if self._future is not None and self._future[2].done():
@@ -864,6 +733,9 @@ class WallpaperView:
             except Exception as exc:
                 log("[월페이퍼] 배경을 만들지 못했습니다: %s" % exc)
                 pixels = None
+                # 열쇠를 비워 두어야 같은 장면이라도 다음 차례에 다시 굽습니다.
+                # 그대로 두면 _bake_sky() 가 같은 열쇠에서 일찍 물러납니다.
+                self._bake_key = None
             if key == self._bake_key and pixels is not None:
                 self._palette = palette
                 self.canvas.itemconfigure(self.phase_item, text=palette["label"])
@@ -933,6 +805,7 @@ class WallpaperView:
             c.coords(bar, x, baseline - height, x, baseline)
             c.coords(glow, x, baseline - height, x, baseline)
             c.coords(reflection, x, baseline + 6 * s, x, baseline + 6 * s + height * .17)
+
     def _tick(self):
         self._after_id = None
         if not self.running:
@@ -943,7 +816,7 @@ class WallpaperView:
         try:
             if self._mode != "wall":
                 # 녹화 화면에서는 표시등 맥박과 하늘만 돌립니다.
-                self._pulse_recording(now)
+                self.recording.pulse(now)
                 self._poll_sky(now)
                 if now - self._baked_at > 30:
                     self._bake_sky()
@@ -987,6 +860,24 @@ class WallpaperView:
                 self._moon_slot = slot
                 self._place_moon()
         self.canvas.itemconfigure(self.sec_item, text="%02d" % now.tm_sec)
+
+    def apply_settings(self, settings):
+        """환경설정에서 바뀐 값을 켜 둔 채로 갈아 끼웁니다.
+
+        예전에는 이 자리가 없어서, 도시를 바꾸면 좌표를 따라간 기온만 새 도시
+        것으로 바뀌고 화면에 적히는 이름은 옛 도시가 그대로 남았습니다. 본 창이
+        같은 인스턴스를 껐다 켤 뿐 새로 만들지는 않기 때문입니다.
+        """
+        self.settings = dict(settings)
+        self.fps = max(12, min(40, int(settings.get("wallpaper_fps", 30))))
+        self.period = round(1000 / self.fps)
+        city = str(settings.get("city") or "")
+        if city != self._city_text:
+            self._city_text = city
+            self._fit_city()
+        # 24시간·12시간 표시도 설정에 들어 있으므로 그 자리에서 다시 적습니다.
+        now = time.localtime()
+        self._set_clock_time(now.tm_hour, now.tm_min)
 
     def refresh_language(self):
         """환경설정에서 쓰는 말을 바꾸면 적어 둔 글자를 새 말로 갈아 끼웁니다.
@@ -1098,11 +989,12 @@ class WallpaperView:
 
     def _apply_track(self, force=False):
         provider = self.nowplaying
-        version = provider.version if provider else 0
-        if not force and version == self._track_version:
+        # 이름을 ``version`` 으로 두면 모듈 :mod:`component.version` 을 가립니다.
+        revision = provider.version if provider else 0
+        if not force and revision == self._track_version:
             return
         first = self._track_version == -1
-        self._track_version = version
+        self._track_version = revision
         track = provider.track if provider else None
         playing = bool(track and track.is_playing())
         # 아티스트와 곡을 한 줄로 붙여 오른쪽 빈자리를 줄입니다.
@@ -1138,22 +1030,41 @@ class WallpaperView:
     def _set_cover(self, data):
         side = max(1, round(COVER_SIZE * self.scale))
         # 같은 곡에서 날씨·창 위치만 바뀌면 JPEG를 다시 풀지 않습니다.
-        key = (id(data), side)
-        if key == self._cover_render_key:
+        # 주소(``id``)가 아니라 그림 객체 자체를 붙들고 견줍니다. 주소는 파이썬이
+        # 버린 자리를 다시 쓰면 다른 그림에도 같은 값이 나올 수 있습니다.
+        if data is self._cover_data and side == self._cover_side:
             return
-        self._cover_render_key, self._cover_data = key, data
+        self._cover_data, self._cover_side = data, side
         png = imaging.rounded_cover_png(data, side, round(14 * self.scale)) if data else None
         new = tk.PhotoImage(master=self.parent, data=png, format="png") if png else None
         old, self._cover_image = self._cover_image, new
         self.canvas.itemconfigure(self.cover_item, image=new or "")
         _drop_image(self.parent, old)
+        self._show_cover_backdrop()
+
+    def _show_cover_backdrop(self):
+        """커버가 없을 때만 받침과 레코드 문양을 보여 줍니다.
+
+        받침은 커버를 받지 못했을 때 음악 자리가 비어 보이지 않게 하는 것인데,
+        커버가 올라오면 그 둥근 모서리 바깥으로 받침의 어두운 색이 비쳐 네
+        귀퉁이에 커버와 어울리지 않는 검은 자국이 남습니다. 커버 그림은 이미
+        제 모서리를 둥글게 굽고 있으므로 뒤를 받쳐 줄 이유가 없습니다.
+        """
+        # 녹화 화면에서는 ``wallonly`` 가 이미 모두 감추고 있으므로 건드리지
+        # 않습니다. 월페이퍼로 돌아올 때 set_mode() 가 다시 불러 줍니다.
+        if self._mode != "wall":
+            return
+        state = "hidden" if self._cover_image is not None else "normal"
+        for item in (self.cover_mat, self.record_center, *self.record_items):
+            self.canvas.itemconfigure(item, state=state)
 
     def _apply_weather(self, force=False):
         provider = self.weather
-        version = provider.version if provider else 0
-        if not force and version == self._weather_version:
+        # 이름을 ``version`` 으로 두면 모듈 :mod:`component.version` 을 가립니다.
+        revision = provider.version if provider else 0
+        if not force and revision == self._weather_version:
             return
-        self._weather_version = version
+        self._weather_version = revision
         current = provider.current if provider else None
         if current is None or not current.ok or current.temp is None:
             self.canvas.itemconfigure(self.temp_item, text="—")
@@ -1161,7 +1072,7 @@ class WallpaperView:
             self._place_temp()
             self._place_weather_icon()
             self.canvas.itemconfigure(self.desc_item, text=tr(
-                "날씨 연결 중" if version == 0 else "날씨 정보 없음"))
+                "날씨 연결 중" if revision == 0 else "날씨 정보 없음"))
             self.canvas.itemconfigure(self.meta_item, text="")
             self.canvas.itemconfigure(self.meta2_item, text="")
             self.canvas.itemconfigure(self.wicon_item, image="")
@@ -1370,14 +1281,6 @@ def _cut_to(text, font, room):
         else:
             high = mid - 1
     return low
-
-
-def _round_rect(x, y, width, height, radius):
-    r = radius
-    return (x + r, y, x + width - r, y, x + width, y, x + width, y + r,
-            x + width, y + height - r, x + width, y + height,
-            x + width - r, y + height, x + r, y + height, x, y + height,
-            x, y + height - r, x, y + r, x, y)
 
 
 def _moon_slot(now=None):

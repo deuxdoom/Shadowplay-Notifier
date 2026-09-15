@@ -3,7 +3,7 @@
 import ctypes
 import sys
 
-from .paths import detail, log
+from .paths import detail
 from .theme import WIN_H, WIN_W
 
 

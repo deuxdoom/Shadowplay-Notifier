@@ -21,7 +21,6 @@ gdiplus = ctypes.windll.gdiplus
 
 PIXEL_FORMAT_32BPP_ARGB = 0x0026200A
 INTERPOLATION_HQ_BICUBIC = 7
-WRAP_MODE_TILE_FLIP_XY = 3
 
 
 class _StartupInput(ctypes.Structure):

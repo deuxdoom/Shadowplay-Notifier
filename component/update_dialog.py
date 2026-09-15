@@ -14,7 +14,7 @@ from . import dialogs, display, fonts, updater
 from . import update_windows as win
 from .i18n import tr
 from .paths import log
-from .theme import C_BG, C_FIELD, C_FG, C_LINE, C_MUTED, C_SKY
+from .theme import C_BG, C_FIELD, C_FG, C_LINE, C_MUTED, C_SKY, pick_family
 from .version import VERSION
 
 PHASES = {
@@ -77,12 +77,13 @@ class UpdateWindow:
         self.progress.start(12)
 
     def _label(self, text, size, color, weight="normal"):
-        return tk.Label(self.box, text=text, font=("Malgun Gothic", -size, weight),
+        return tk.Label(self.box, text=text,
+                        font=(pick_family(self.box), -size, weight),
                         fg=color, bg=C_BG, justify="left", anchor="w", wraplength=464)
 
     def button(self, text, command, primary=False):
         return tk.Button(self.buttons, text=text, command=command,
-                         font=("Malgun Gothic", -14, "bold"),
+                         font=(pick_family(self.buttons), -14, "bold"),
                          bg=C_SKY if primary else C_FIELD,
                          fg=C_BG if primary else C_FG,
                          activebackground=C_SKY, activeforeground=C_BG,

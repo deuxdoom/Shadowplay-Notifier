@@ -228,22 +228,3 @@ def moon_phase(when=None):
     """
     now = time.time() if when is None else when
     return ((now - KNOWN_NEW_MOON) % SYNODIC_MONTH) / SYNODIC_MONTH
-
-
-def moon_name(phase):
-    """위상에 붙는 이름입니다."""
-    if phase < 0.03 or phase >= 0.97:
-        return "삭"
-    if phase < 0.22:
-        return "초승달"
-    if phase < 0.28:
-        return "상현달"
-    if phase < 0.47:
-        return "차오르는 달"
-    if phase < 0.53:
-        return "보름달"
-    if phase < 0.72:
-        return "기우는 달"
-    if phase < 0.78:
-        return "하현달"
-    return "그믐달"

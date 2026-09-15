@@ -10,7 +10,8 @@ from tkinter import ttk
 
 from . import display, icons
 from .i18n import tr
-from .theme import C_BG, C_DIM, C_FG, C_FIELD, C_LINE, C_MUTED, C_PANEL, C_SKY
+from .theme import (C_BG, C_DIM, C_FG, C_FIELD, C_LINE, C_MUTED, C_PANEL,
+                    C_SKY, pick_family)
 
 
 def title_bar(window, title, on_close):
@@ -23,9 +24,10 @@ def title_bar(window, title, on_close):
     symbol = tk.Label(bar, image=icon, bg=C_PANEL)
     symbol.image = icon
     symbol.pack(side="left", padx=(12, 8), pady=8)
-    label = tk.Label(bar, text=title, font=("Malgun Gothic", -14), bg=C_PANEL, fg=C_FG)
+    family = pick_family(window)
+    label = tk.Label(bar, text=title, font=(family, -14), bg=C_PANEL, fg=C_FG)
     label.pack(side="left")
-    close = tk.Label(bar, text="×", font=("Malgun Gothic", -22), bg=C_PANEL,
+    close = tk.Label(bar, text="×", font=(family, -22), bg=C_PANEL,
                      fg=C_DIM, padx=12, cursor="hand2")
     close.pack(side="right")
     close.bind("<Button-1>", lambda _event: on_close())
@@ -66,7 +68,8 @@ def place(window, parent, width):
 
 
 def button(parent, text, command, primary=False):
-    return tk.Button(parent, text=text, command=command, font=("Malgun Gothic", -14),
+    return tk.Button(parent, text=text, command=command,
+                     font=(pick_family(parent), -14),
                      bg=C_SKY if primary else C_FIELD, fg=C_BG if primary else C_FG,
                      activebackground=C_SKY, activeforeground=C_BG,
                      relief="flat", padx=16, pady=7, cursor="hand2")
@@ -84,7 +87,7 @@ def show_message(title, message, parent=None):
     title_bar(window, title, window.destroy)
     body = tk.Frame(window, bg=C_BG, padx=24, pady=20)
     body.pack(fill="both", expand=True)
-    tk.Label(body, text=message, font=("Malgun Gothic", -15), bg=C_BG, fg=C_FG,
+    tk.Label(body, text=message, font=(pick_family(body), -15), bg=C_BG, fg=C_FG,
              wraplength=430, justify="left").pack(anchor="w")
     button(body, tr("확인"), window.destroy, True).pack(anchor="e", pady=(20, 0))
     previous_grab = parent.grab_current()
@@ -115,20 +118,22 @@ class FolderDialog:
         navigation.pack(fill="x")
         button(navigation, tr("상위 폴더"), self.up).pack(side="left", padx=(0, 8))
         self.path_var = tk.StringVar()
+        family = pick_family(self.window)
         self.address = tk.Entry(navigation, textvariable=self.path_var,
-                                font=("Malgun Gothic", -14), bg=C_FIELD, fg=C_FG,
+                                font=(family, -14), bg=C_FIELD, fg=C_FG,
                                 insertbackground=C_FG, relief="flat")
         self.address.pack(side="left", fill="x", expand=True, ipady=8)
         self.address.bind("<Return>", lambda _event: self.navigate(self.path_var.get()))
         button(navigation, tr("이동"), lambda: self.navigate(self.path_var.get())).pack(side="right", padx=(8, 0))
         mask = ctypes.windll.kernel32.GetLogicalDrives()
         drives = ["%s:\\" % chr(65 + bit) for bit in range(26) if mask & (1 << bit)]
-        self.drive = ttk.Combobox(self.body, values=drives, state="readonly", font=("Malgun Gothic", -13))
+        self.drive = ttk.Combobox(self.body, values=drives, state="readonly",
+                                  font=(family, -13))
         self.drive.pack(anchor="w", pady=(12, 8))
         self.drive.bind("<<ComboboxSelected>>", lambda _event: self.navigate(self.drive.get()))
         listing = tk.Frame(self.body, bg=C_BG)
         listing.pack(fill="both", expand=True)
-        self.listbox = tk.Listbox(listing, height=10, font=("Malgun Gothic", -14),
+        self.listbox = tk.Listbox(listing, height=10, font=(family, -14),
                                   bg=C_FIELD, fg=C_FG, selectbackground=C_SKY,
                                   selectforeground=C_BG, relief="flat", activestyle="none",
                                   exportselection=False, highlightthickness=1,
@@ -140,7 +145,7 @@ class FolderDialog:
         self.listbox.bind("<Double-Button-1>", self.open_selected)
         self.listbox.bind("<Return>", self.open_selected)
         self.note = tk.Label(self.body, text="", bg=C_BG, fg=C_MUTED,
-                             font=("Malgun Gothic", -12), wraplength=530, anchor="w")
+                             font=(family, -12), wraplength=530, anchor="w")
         self.note.pack(fill="x", pady=(8, 12))
         buttons = tk.Frame(self.body, bg=C_BG)
         buttons.pack(fill="x")

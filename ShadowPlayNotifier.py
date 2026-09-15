@@ -19,7 +19,7 @@ from component.app import MonitorApp
 from component.config import build_settings, load_config, parse_args
 from component.display import enable_dpi_awareness, window_position
 from component.paths import detail, install_excepthook, log, set_verbose
-from component.theme import C_BG, C_MUTED, WIN_H, WIN_W
+from component.theme import C_BG, WIN_H, WIN_W
 from component.watcher import WatchSupervisor
 from component.tray import TrayIcon
 
@@ -149,7 +149,7 @@ def main(argv=None):
 
     supervisor.start(settings)
     updater.schedule_cleanup()
-    app.add_log("[시작] 감시를 시작했습니다.", C_MUTED, "", "감시를 시작했습니다")
+    app.add_log("[시작] 감시를 시작했습니다.", "", "감시를 시작했습니다")
     log("앱 시작 %s  감시: %s" % (version.VERSION,
                                   " · ".join(settings["dirs"]) or "(없음)"))
     try:

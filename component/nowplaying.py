@@ -80,8 +80,8 @@ class Track:
     artist: str = ""
     title: str = ""
     album: str = ""
-    cover: bytes = field(default=None, repr=False)
-    accent: tuple = None
+    cover: bytes | None = field(default=None, repr=False)
+    accent: tuple | None = None
 
     @property
     def key(self):

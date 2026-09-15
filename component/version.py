@@ -12,7 +12,7 @@
 """
 
 APP_NAME = "ShadowPlay Notifier"
-VERSION = "2.4.0"
+VERSION = "2.4.1"
 AUTHOR = "deuxdoom"
 
 

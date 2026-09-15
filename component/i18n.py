@@ -184,6 +184,22 @@ EN = {
     "업데이트 작업 폴더가 올바르지 않습니다.":
         "The update working folder is not valid.",
     "재실행 인자가 올바르지 않습니다.": "The restart arguments are not valid.",
+    "다운로드 크기가 릴리스 정보보다 큽니다.":
+        "The download is larger than the release says.",
+    "업데이트 도우미는 별도 위치에서 실행해야 합니다.":
+        "The update helper has to run from a separate location.",
+    "업데이트와 복구 파일을 저장할 디스크 공간이 부족합니다.":
+        "There is not enough disk space for the update and its backup.",
+    "업데이트 준비 중 기존 실행 파일이 변경되었습니다.":
+        "The program on disk changed while the update was getting ready.",
+    "기존 실행 파일이 변경되어 업데이트를 중단했습니다.":
+        "The program on disk changed, so the update was stopped.",
+    "자동 업데이트는 배포된 EXE에서 사용할 수 있습니다.":
+        "Automatic updates work only from the released EXE.",
+    "%s\n이전 프로그램을 다시 실행했습니다.":
+        "%s\nThe previous program has been started again.",
+    "%s\n복구 후 실행을 확인하지 못했습니다: %s\n기존 파일: %s":
+        "%s\nCould not confirm it started after recovery: %s\nPrevious file: %s",
     # ---------------------------------------------------------- 날씨
     "맑음": "Clear",
     "대체로 맑음": "Mostly clear",
@@ -378,6 +394,22 @@ JA = {
     "업데이트 작업 폴더가 올바르지 않습니다.":
         "アップデート用の作業フォルダーが正しくありません。",
     "재실행 인자가 올바르지 않습니다.": "再起動の引数が正しくありません。",
+    "다운로드 크기가 릴리스 정보보다 큽니다.":
+        "ダウンロードした大きさがリリースの情報より大きいです。",
+    "업데이트 도우미는 별도 위치에서 실행해야 합니다.":
+        "アップデート補助プログラムは別の場所で実行する必要があります。",
+    "업데이트와 복구 파일을 저장할 디스크 공간이 부족합니다.":
+        "アップデートと復元用ファイルを置くディスクの空きが足りません。",
+    "업데이트 준비 중 기존 실행 파일이 변경되었습니다.":
+        "アップデートの準備中に既存の実行ファイルが変わりました。",
+    "기존 실행 파일이 변경되어 업데이트를 중단했습니다.":
+        "既存の実行ファイルが変わったため、アップデートを中止しました。",
+    "자동 업데이트는 배포된 EXE에서 사용할 수 있습니다.":
+        "自動アップデートは配布された EXE でのみ使えます。",
+    "%s\n이전 프로그램을 다시 실행했습니다.":
+        "%s\n以前のプログラムを実行し直しました。",
+    "%s\n복구 후 실행을 확인하지 못했습니다: %s\n기존 파일: %s":
+        "%s\n復元後の起動を確認できませんでした: %s\n以前のファイル: %s",
     # ---------------------------------------------------------- 날씨
     "맑음": "晴れ",
     "대체로 맑음": "おおむね晴れ",
