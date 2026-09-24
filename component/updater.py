@@ -150,7 +150,7 @@ def download(release, destination, report, cancel):
                 raise UpdateError(tr("서버의 파일 크기가 릴리스 정보와 다릅니다."))
             while True:
                 if cancel.is_set():
-                    raise Cancelled("업데이트를 취소했습니다.")
+                    raise Cancelled(tr("업데이트를 취소했습니다."))
                 chunk = response.read(128 * 1024)
                 if not chunk:
                     break
@@ -162,7 +162,7 @@ def download(release, destination, report, cancel):
                        "%.1f / %.1f MB" % (received / 1048576, release.size / 1048576))
             output.flush()
             os.fsync(output.fileno())
-        report("verify", 78, "파일 크기와 SHA-256을 확인하고 있습니다.")
+        report("verify", 78, tr("파일 크기와 SHA-256을 확인하고 있습니다."))
         verify_exe(destination, release.size, release.sha256)
     except BaseException:
         destination.unlink(missing_ok=True)
@@ -196,27 +196,27 @@ def install(release, target, arguments, report, cancel):
     try:
         download(release, payload, report, cancel)
         if cancel.is_set():
-            raise Cancelled("업데이트를 취소했습니다.")
+            raise Cancelled(tr("업데이트를 취소했습니다."))
         shutil.copy2(target, backup)
         original_hash = file_hash(backup)
         if original_hash != file_hash(target):
             raise UpdateError(tr("업데이트 준비 중 기존 실행 파일이 변경되었습니다."))
-        report("stop", 82, "실행 중인 프로그램을 종료하고 있습니다.")
+        report("stop", 82, tr("실행 중인 프로그램을 종료하고 있습니다."))
         stopped = True
         win.stop_target(target)
         if original_hash != file_hash(target):
             raise UpdateError(tr("기존 실행 파일이 변경되어 업데이트를 중단했습니다."))
-        report("replace", 88, "원래 폴더의 실행 파일을 교체하고 있습니다.")
+        report("replace", 88, tr("원래 폴더의 실행 파일을 교체하고 있습니다."))
         replace_retry(payload, target)
         replaced = True
         verify_exe(target, release.size, release.sha256)
-        report("restart", 94, "새 버전을 실행하고 응답을 확인하고 있습니다.")
+        report("restart", 94, tr("새 버전을 실행하고 응답을 확인하고 있습니다."))
         pid = win.restart(target, arguments)
-        report("done", 100, "업데이트가 완료되어 프로그램을 다시 실행했습니다.")
+        report("done", 100, tr("업데이트가 완료되어 프로그램을 다시 실행했습니다."))
         return pid
     except Exception as exc:
         if stopped:
-            report("rollback", 90, "업데이트를 마치지 못해 이전 프로그램을 복구하고 있습니다.")
+            report("rollback", 90, tr("업데이트를 마치지 못해 이전 프로그램을 복구하고 있습니다."))
             try:
                 win.stop_target(target)
                 if replaced:

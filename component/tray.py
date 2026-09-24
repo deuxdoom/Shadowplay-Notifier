@@ -141,6 +141,15 @@ class TrayIcon:
         if message == 0x111 and (wparam & 0xffff) in self.COMMANDS:  # WM_COMMAND
             self._events.append(self.COMMANDS[wparam & 0xffff])
             return 0
+        if message == 0x0011:  # WM_QUERYENDSESSION
+            return 1  # 윈도우 종료를 막지 않습니다.
+        if message == 0x0016:  # WM_ENDSESSION
+            if wparam:
+                # 이 메시지에서 돌아가면 프로세스가 언제든 끝날 수 있어서, 정리
+                # 코드가 돌지 못해도 흔적이 남도록 기록 한 줄만은 여기서 남깁니다.
+                log("[종료] 윈도우 세션이 끝나 종료합니다")
+                self._events.append("quit")
+            return 0
         return user32.DefWindowProcW(hwnd, message, wparam, lparam)
 
     def _drain(self):

@@ -5,6 +5,7 @@
 
 import argparse
 import json
+import math
 import os
 
 from . import cities, i18n
@@ -66,11 +67,27 @@ def load_config():
 
 
 def write_config(values):
-    """설정 파일에 그대로 씁니다. 성공 여부를 돌려줍니다."""
+    """설정 파일에 그대로 씁니다. 성공 여부를 돌려줍니다.
+
+    같은 폴더의 임시 파일에 끝까지 쓴 뒤 바꿔 끼웁니다. 시계를 누를 때마다
+    쓰는 파일이라, 쓰는 도중 전원이 나가면 반쯤 쓰인 파일이 남아 다음에
+    켤 때 설정이 기본값으로 돌아가기 때문입니다.
+    """
+    tmp_path = "%s.%d.tmp" % (CONFIG_PATH, os.getpid())
     try:
-        with open(CONFIG_PATH, "w", encoding="utf-8") as fp:
-            json.dump(values, fp, ensure_ascii=False, indent=2)
-            fp.write("\n")
+        try:
+            with open(tmp_path, "w", encoding="utf-8") as fp:
+                json.dump(values, fp, ensure_ascii=False, indent=2)
+                fp.write("\n")
+                fp.flush()
+                os.fsync(fp.fileno())
+            os.replace(tmp_path, CONFIG_PATH)
+        except BaseException:
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
+            raise
         return True
     except OSError as exc:
         log("[설정] config.json 을 쓰지 못했습니다: %s" % exc)
@@ -160,6 +177,22 @@ def parse_args(argv):
         return ap.parse_args([])
 
 
+def _number(convert, value, key, fallback):
+    """값을 숫자로 바꿉니다. 바꿀 수 없으면 기본값을 쓰고 기록을 남깁니다.
+
+    config.json 의 숫자 자리에 글자가 들어 있으면 float()/int() 가 터져
+    앱이 창도 띄우지 못하고 끝나기 때문입니다.
+    """
+    try:
+        number = convert(value)
+        if isinstance(number, float) and not math.isfinite(number):
+            raise ValueError(value)
+        return number
+    except (TypeError, ValueError, OverflowError):
+        log("[설정] %s 값이 올바르지 않아 기본값을 씁니다" % key)
+        return fallback
+
+
 def build_settings(cfg, args):
     """config.json 위에 명령줄 인자를 덮어써서 최종 설정을 만듭니다."""
 
@@ -169,24 +202,31 @@ def build_settings(cfg, args):
         value = cfg.get(key, fallback)
         return fallback if value is None else value
 
+    def number(convert, arg_value, key, fallback):
+        return _number(convert, pick(arg_value, key, fallback), key, fallback)
+
+    # 0.0 도 올바른 좌표이므로 값이 없을 때만 서울 좌표를 씁니다.
+    latitude = number(float, None, "latitude", 37.5665)
+    longitude = number(float, None, "longitude", 126.9780)
+
     patterns = tuple(p.lower() for p in (args.pattern
                                          or as_list(cfg.get("patterns"))) if p)
     return {
         "dirs": normalize(args.dir or as_list(cfg.get("dir"))),
         "outdirs": normalize(args.outdir or as_list(cfg.get("outdir"))),
         "patterns": patterns or DEFAULT_PATTERNS,
-        "interval": max(0.2, float(pick(args.interval, "interval", 0.5))),
-        "stall": max(1.0, float(pick(args.stall, "stall", 8.0))),
-        "min_size": int(pick(args.min_size, "min_size", 1024 * 1024)),
-        "min_growth": int(pick(args.min_growth, "min_growth", 256 * 1024)),
+        "interval": max(0.2, number(float, args.interval, "interval", 0.5)),
+        "stall": max(1.0, number(float, args.stall, "stall", 8.0)),
+        "min_size": number(int, args.min_size, "min_size", 1024 * 1024),
+        "min_growth": number(int, args.min_growth, "min_growth", 256 * 1024),
         "recursive": bool(cfg.get("recursive", True)) and not args.no_recursive,
         "beep": bool(pick(args.beep, "beep", False)),
         "fast_detect": bool(pick(args.fast_detect, "fast_detect", True)),
         "topmost": bool(pick(args.topmost, "topmost", False)),
         "borderless": True,
-        "monitor": int(pick(args.monitor, "monitor", -1)),
-        "latitude": float(cfg.get("latitude", 37.5665) or 37.5665),
-        "longitude": float(cfg.get("longitude", 126.9780) or 126.9780),
+        "monitor": number(int, args.monitor, "monitor", -1),
+        "latitude": latitude,
+        "longitude": longitude,
         # 화면에 쓰는 말입니다. 여기에서 정해 두면 뒤에 만드는 창들이 모두
         # 같은 말로 나옵니다.
         "language": i18n.set_language(cfg.get("language", i18n.DEFAULT)),
@@ -194,13 +234,12 @@ def build_settings(cfg, args):
         # 화면에 적는 이름입니다. 예전 설정 파일에는 없으므로, 비어 있으면
         # 좌표에 맞는 도시를 목록에서 찾아 채웁니다.
         "city": str(cfg.get("city") or "").strip() or nearest_city_name(
-            float(cfg.get("latitude", 37.5665) or 37.5665),
-            float(cfg.get("longitude", 126.9780) or 126.9780)),
+            latitude, longitude),
         # monitor.log 에 자세한 기록까지 남길지 정합니다. 문제를 찾을 때만 켭니다.
         "verbose_log": bool(cfg.get("verbose_log", False)),
-        "wallpaper_fps": max(12, min(40, int(
-            cfg.get("wallpaper_fps", WALLPAPER_FPS_DEFAULT)
-            or WALLPAPER_FPS_DEFAULT))),
+        "wallpaper_fps": max(12, min(40, number(
+            int, None, "wallpaper_fps", WALLPAPER_FPS_DEFAULT)
+            or WALLPAPER_FPS_DEFAULT)),
     }
 
 

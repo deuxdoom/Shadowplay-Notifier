@@ -33,6 +33,8 @@ BASE_DIR = base_dir()
 RESOURCE_DIR = resource_dir()
 CONFIG_PATH = os.path.join(BASE_DIR, "config.json")
 LOG_PATH = os.path.join(BASE_DIR, "monitor.log")
+# 기록이 이보다 커지면 monitor.log.1 로 옮기고 새로 씁니다.
+LOG_MAX_BYTES = 1024 * 1024
 
 _log_lock = threading.Lock()
 
@@ -60,11 +62,53 @@ def log(message):
     """--noconsole 로 빌드하므로 화면 출력 대신 파일에 남깁니다."""
     line = "%s  %s" % (time.strftime("%Y-%m-%d %H:%M:%S"), message)
     with _log_lock:
+        _rotate()
         try:
             with open(LOG_PATH, "a", encoding="utf-8") as fp:
                 fp.write(line + "\n")
         except OSError:
             pass
+
+
+def _rotate():
+    """기록이 너무 커졌으면 monitor.log.1 로 옮깁니다. _log_lock 안에서 부릅니다.
+
+    예전 .1 은 덮어씁니다. 옮기지 못하면 지금 파일에 그대로 이어 씁니다.
+    """
+    try:
+        if os.path.getsize(LOG_PATH) > LOG_MAX_BYTES:
+            os.replace(LOG_PATH, LOG_PATH + ".1")
+    except OSError:
+        pass
+
+
+class RepeatedLog:
+    """같은 오류가 되풀이될 때 기록이 쌓이지 않도록 묶어 남깁니다.
+
+    처음 보는 문구는 곧바로 남기고, 같은 문구가 다시 오면 세어 두었다가
+    ``interval`` 초에 한 번 몇 번 되풀이되었는지 한 줄로 남깁니다.
+    """
+
+    # 문구가 계속 달라지면 표가 끝없이 자라므로 이만큼에서 비웁니다.
+    LIMIT = 32
+
+    def __init__(self, interval=60.0):
+        self.interval = interval
+        self._seen = {}
+
+    def log(self, message):
+        now = time.monotonic()
+        seen = self._seen.get(message)
+        if seen is None:
+            if len(self._seen) >= self.LIMIT:
+                self._seen.clear()
+            self._seen[message] = [now, 0]
+            log(message)
+            return
+        seen[1] += 1
+        if now - seen[0] >= self.interval:
+            log("%s (같은 오류가 %d번 되풀이되었습니다)" % (message, seen[1]))
+            seen[0], seen[1] = now, 0
 
 
 def install_excepthook():

@@ -12,7 +12,7 @@ import tkinter as tk
 
 from . import cities, dialogs, i18n, icons, weather
 from .config import save_config, settings_to_config
-from .display import monitor_for_point
+from .display import primary_rect
 from .paths import detail, log
 from .theme import (C_BG, C_DIM, C_FG, C_FIELD, C_LINE, C_MUTED, C_PANEL,
                     C_REC_TEXT, C_SKY, MONO_FAMILIES, UI_FAMILIES, pick_font)
@@ -65,6 +65,12 @@ class SettingsDialog:
         self._suggest_window = None
         self._suggest_list = None
         self._ssl = ssl.create_default_context()
+        # 저장할 때 인터넷으로 찾는 도시입니다. 조회하는 동안 창이 멈추지
+        # 않도록 다른 스레드에 맡기고 결과는 ``_poll_city`` 가 받습니다.
+        self._city_lookup = None
+        self._city_ready = None
+        self._city_poll = None
+        self._city_found = None
 
         self._build()
         self._fill(settings)
@@ -118,7 +124,10 @@ class SettingsDialog:
                                       event.y_root - self._drag_from[1]))
 
     def _place(self):
-        """본 창 한가운데에 놓되, 그 화면 밖으로 나가지 않게 다듬습니다.
+        """주 모니터 한가운데에 놓되, 그 화면 밖으로 나가지 않게 다듬습니다.
+
+        본 창은 작은 보조 모니터에 떠 있으므로, 설정을 고치는 창은 사용자가
+        보고 있는 주 모니터에 띄웁니다.
 
         높이는 내용이 요구하는 만큼 씁니다. 화면 배율이 높은 환경에서 pt 로
         지정한 글자가 커지는데, 창을 고정 높이로 두면 아래쪽 항목이 통째로
@@ -128,18 +137,12 @@ class SettingsDialog:
         self.top.update_idletasks()
         width = max(DIALOG_W, self.top.winfo_reqwidth())
         height = max(DIALOG_H, self.top.winfo_reqheight())
-        rect = monitor_for_point(self.parent.winfo_x() + 10,
-                                 self.parent.winfo_y() + 10)
-        if rect:
-            width = min(width, rect[2] - 16)
-            height = min(height, rect[3] - 60)
-        left = self.parent.winfo_x() + (self.parent.winfo_width() - width) // 2
-        top = self.parent.winfo_y() + (self.parent.winfo_height() - height) // 2
-        if rect:
-            m_left, m_top, m_width, m_height = rect
-            # 타이틀바와 테두리가 더 붙으므로 그만큼 미리 빼 둡니다.
-            left = min(max(left, m_left), m_left + m_width - width)
-            top = min(max(top, m_top), m_top + m_height - height - 44)
+        m_left, m_top, m_width, m_height = primary_rect() or (
+            0, 0, self.top.winfo_screenwidth(), self.top.winfo_screenheight())
+        width = min(width, m_width - 16)
+        height = min(height, m_height - 60)
+        left = m_left + (m_width - width) // 2
+        top = m_top + (m_height - height) // 2
         # 타이틀바가 없는 창은 Z 순서를 스스로 지키지 못해서, 월페이퍼가 다시
         # 그려질 때마다 본 창 뒤로 숨습니다. 잠깐 쓰는 창이므로 맨 위에 둡니다.
         # **자리를 잡기 전에 걸어야 합니다.** 이 속성을 나중에 주면 Tk 가 창을
@@ -203,8 +206,8 @@ class SettingsDialog:
         self._label(footer, i18n.tr("저장하면 config.json 에 적고 감시를 다시 시작합니다."),
                     font=self.f_note, bg=C_PANEL).pack(
             side="left", padx=18, pady=11)
-        self._button(footer, i18n.tr("저장"), self.save, C_SKY, "#0b0b0d").pack(
-            side="right", padx=(6, 18), pady=9)
+        self.b_save = self._button(footer, i18n.tr("저장"), self.save, C_SKY, "#0b0b0d")
+        self.b_save.pack(side="right", padx=(6, 18), pady=9)
         self._button(footer, i18n.tr("취소"), self.close, C_FIELD, C_DIM).pack(
             side="right", pady=9)
 
@@ -461,13 +464,49 @@ class SettingsDialog:
         found = cities.find(text)
         if found:
             return found[0], found[3], found[4]
-        # 후보를 고르지 않고 그대로 저장할 때만 여기에서 한 번 조회합니다.
-        rows = weather.geocode(text, 1, self._ssl)
-        if rows:
-            detail("[설정] 도시를 찾았습니다: %s" % (rows[0],))
-            return rows[0][0], rows[0][2], rows[0][3]
-        self.message.config(text=i18n.tr("%s 을(를) 찾지 못했습니다. 후보에서 고르십시오.") % text)
+        if self._city_found and self._city_found[0] == text:
+            return self._city_found[1:]
+        # 후보를 고르지 않고 그대로 저장할 때만 인터넷으로 한 번 찾습니다.
+        # 결과가 오면 저장을 이어 가므로 여기서는 아직 모른다고 답합니다.
+        self._lookup_city(text)
         return None, 0.0, 0.0
+
+    def _lookup_city(self, text):
+        """적어 둔 도시를 인터넷으로 찾습니다. 조회는 다른 스레드가 맡습니다."""
+        self._city_lookup = text
+        self.b_save.config(state="disabled")
+        self.message.config(text=i18n.tr("도시를 찾는 중…"))
+
+        def work():
+            try:
+                rows = weather.geocode(text, 1, self._ssl)
+            except Exception:
+                rows = []
+            with self._suggest_lock:
+                self._city_ready = (text, rows)
+
+        threading.Thread(target=work, name="geocode-save", daemon=True).start()
+        self._city_poll = self.top.after(80, self._poll_city)
+
+    def _poll_city(self):
+        """도시 조회 결과를 Tk 스레드에서 받아 저장을 이어 갑니다."""
+        self._city_poll = None
+        with self._suggest_lock:
+            ready, self._city_ready = self._city_ready, None
+        if ready is None:
+            self._city_poll = self.top.after(80, self._poll_city)
+            return
+        text, rows = ready
+        self._city_lookup = None
+        self.b_save.config(state="normal")
+        if not rows:
+            self.message.config(
+                text=i18n.tr("%s 을(를) 찾지 못했습니다. 후보에서 고르십시오.") % text)
+            return
+        detail("[설정] 도시를 찾았습니다: %s" % (rows[0],))
+        self._city_found = (text, rows[0][0], rows[0][2], rows[0][3])
+        self.message.config(text="")
+        self.save()
 
     # ------------------------------------------------------------ 값 다루기
 
@@ -534,6 +573,8 @@ class SettingsDialog:
         return updated
 
     def save(self):
+        if self._city_lookup is not None:
+            return
         updated = self._collect()
         if updated is None:
             return
@@ -545,7 +586,8 @@ class SettingsDialog:
         self.on_apply(updated)
 
     def close(self):
-        for name in ("_suggest_after", "_suggest_poll"):
+        # 도시를 찾는 중이었다면 결과를 받지 않고 버립니다.
+        for name in ("_suggest_after", "_suggest_poll", "_city_poll"):
             token = getattr(self, name, None)
             if token is not None:
                 try:

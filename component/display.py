@@ -62,6 +62,24 @@ def monitor_for_point(x, y):
     return None
 
 
+def primary_rect():
+    """주 모니터에서 작업 표시줄을 뺀 영역을 (좌, 상, 너비, 높이) 로 돌려줍니다.
+
+    환경설정·업데이트·알림 같은 팝업은 본 창이 떠 있는 작은 보조 모니터가
+    아니라 사용자가 보고 있는 주 모니터 가운데에 띄웁니다. 읽지 못하면
+    주 모니터 전체를, 그것도 못 읽으면 None 을 돌려줍니다.
+    """
+    if sys.platform.startswith("win"):
+        area = _RECT()
+        try:
+            # SPI_GETWORKAREA 는 주 모니터의 작업 영역입니다.
+            if ctypes.windll.user32.SystemParametersInfoW(0x0030, 0, ctypes.byref(area), 0):
+                return (area.left, area.top, area.right - area.left, area.bottom - area.top)
+        except Exception as exc:
+            detail("[표시] 주 모니터 작업 영역을 읽지 못했습니다: %s" % exc)
+    return monitor_for_point(0, 0)
+
+
 def center_in(rect):
     left, top, width, height = rect
     return (left + max(0, (width - WIN_W) // 2),

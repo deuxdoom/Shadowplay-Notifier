@@ -55,6 +55,8 @@ def main(argv=None):
     if not instance.claim():
         log("[중복 실행] 이미 실행 중이므로 새 창을 띄우지 않습니다.")
         if not instance.focus_existing(version.title()):
+            # 아직 설정을 읽기 전이므로 알림에 쓸 말만 먼저 읽어 옵니다.
+            i18n.set_language(load_config().get("language", i18n.DEFAULT))
             instance.tell_already_running(version.APP_NAME)
         return 1
 
@@ -123,8 +125,10 @@ def main(argv=None):
             startup.set_enabled(not startup.is_enabled())
         except (OSError, ValueError) as exc:
             log("[자동 실행] 설정을 바꾸지 못했습니다: %s" % exc)
-            dialogs.show_message("윈도우 시작 시 실행",
-                                 "자동 실행 설정을 바꾸지 못했습니다.\n%s" % exc, parent=root)
+            # 경로가 너무 길 때의 안내는 한국어 원문으로 오므로 여기에서 옮깁니다.
+            dialogs.show_message(i18n.tr("윈도우 시작 시 실행"),
+                                 i18n.tr("자동 실행 설정을 바꾸지 못했습니다.\n%s")
+                                 % i18n.tr(str(exc)), parent=root)
 
     tray = TrayIcon(root, {
         "show": app.show_window,

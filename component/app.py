@@ -16,7 +16,7 @@ from collections import deque
 
 from . import i18n, version
 from .audio import AudioLevels
-from .config import save_config, settings_to_config
+from .config import save_config
 from .display import monitor_for_point, window_position
 from .i18n import tr
 from .nowplaying import NowPlaying
@@ -49,6 +49,9 @@ class MonitorApp:
         self.close_callback = None
         self.hidden_to_tray = False
         self.settings_callback = None
+        # 녹화 중에 저장한 설정입니다. 녹화가 끝나면 이것으로 감시를 다시 시작합니다.
+        self._pending_watch = None
+        self._settings_dialog = None
         self.fullscreen = False
         self.saved_rect = (0, 0, WIN_W, WIN_H)
         self.queue = queue.Queue()
@@ -166,13 +169,29 @@ class MonitorApp:
     # ------------------------------------------------------------ 환경설정
 
     def open_settings(self):
-        SettingsDialog(self.root, self.settings, self._settings_saved)
+        # 트레이 메뉴에서 오는 길은 grab_set 이 막지 못해 창이 하나 더 뜹니다.
+        # 열린 창이 있으면 새로 만들지 않고 앞으로 불러옵니다.
+        dialog = self._settings_dialog
+        if dialog is not None:
+            try:
+                if dialog.top.winfo_exists():
+                    dialog.top.lift()
+                    dialog.top.focus_force()
+                    return
+            except tk.TclError:
+                pass
+        dialog = SettingsDialog(self.root, self.settings, self._settings_saved)
+        self._settings_dialog = dialog
+
+        def forget(event):
+            if event.widget is dialog.top and self._settings_dialog is dialog:
+                self._settings_dialog = None
+
+        dialog.top.bind("<Destroy>", forget, add="+")
 
     def _settings_saved(self, settings):
         previous = self.settings
         self.settings = dict(settings)
-        self.dirs = settings["dirs"]
-        self.interval = settings["interval"]
         try:
             self.root.attributes("-topmost", settings["topmost"])
             if settings["borderless"] != self.borderless and not self.fullscreen:
@@ -199,8 +218,23 @@ class MonitorApp:
         if any(settings.get(key) != previous.get(key)
                for key in ("latitude", "longitude", "wallpaper_fps")):
             self._restart_sources()
-        self.add_log("[설정] 환경설정을 저장하고 감시를 다시 시작했습니다.")
+        if self.recording:
+            # 새 감시자는 녹화 중인 파일을 모릅니다. 지금 다시 시작하면 화면이
+            # 월페이퍼로 한 번 깜빡이고 경과 시간을 0부터 다시 세며, 중단 기록은
+            # 빠지고 시작 기록은 겹칩니다. 그래서 마지막 설정 하나만 들고 있다가
+            # 녹화가 끝날 때 한 번 다시 시작합니다.
+            self._pending_watch = settings
+            self.add_log(tr("[설정] 녹화가 끝나면 새 설정으로 감시를 다시 시작합니다."))
+        else:
+            self._pending_watch = None
+            self.add_log(tr("[설정] 환경설정을 저장하고 감시를 다시 시작했습니다."))
+            self._restart_watch(settings)
         self._refresh_status()
+
+    def _restart_watch(self, settings):
+        """감시 폴더와 주기를 새 값으로 바꾸고 감시를 다시 시작합니다."""
+        self.dirs = settings["dirs"]
+        self.interval = settings["interval"]
         if self.settings_callback:
             self.settings_callback(settings)
 
@@ -218,9 +252,13 @@ class MonitorApp:
                          "close": lambda: self.close_callback() if self.close_callback else None})
 
     def _clock_changed(self, use_24h):
-        """시계를 눌러 바꾼 24시간·12시간 표시를 설정 파일에 남깁니다."""
+        """시계를 눌러 바꾼 24시간·12시간 표시를 설정 파일에 남깁니다.
+
+        그 키 하나만 씁니다. 설정 전체를 쓰면 명령줄 인자로 덮어쓴 값까지
+        파일에 영구히 남고, 감시 폴더가 여럿이면 첫 번째만 남기 때문입니다.
+        """
         self.settings["clock_24h"] = bool(use_24h)
-        save_config(settings_to_config(self.settings))
+        save_config({"clock_24h": bool(use_24h)})
 
     def _sync_view(self):
         """지금 보여야 할 화면을 정합니다.
@@ -354,6 +392,10 @@ class MonitorApp:
             return
         self.recording = active
         self._sync_view()
+        if not active and self._pending_watch is not None:
+            settings, self._pending_watch = self._pending_watch, None
+            self._restart_watch(settings)
+            self._refresh_status()
 
     def _apply_state(self, event):
         self._set_recording(bool(event.get("active")))

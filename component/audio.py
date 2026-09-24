@@ -6,6 +6,10 @@
 소리를 녹음하는 것이 아니라 세기만 재며, 어디에도 저장하지 않습니다.
 녹화가 시작되면 :meth:`AudioLevels.stop` 으로 장치를 닫습니다.
 
+장치가 끊기거나 윈도우의 기본 출력 장치가 바뀌면 닫았다가 새 기본 장치로
+다시 엽니다. 루프백은 연 장치에 묶여 있어서, 기본 장치만 바꾸면 예외 없이
+예전 장치를 계속 캡처하기 때문입니다.
+
 대역마다 최근 천장과 바닥을 따라가며 그 사이를 0~1 로 펼칩니다. 고정 범위로
 자르면 음악의 저역이 늘 꼭대기에 붙어서 막대가 움직이지 않습니다.
 """
@@ -27,6 +31,10 @@ LOW_HZ, HIGH_HZ = 40.0, 16000.0
 TILT_DB = 4.0
 # 대역이 쓰는 구간이 이보다 좁아지면 더 좁히지 않는다
 MIN_SPAN_DB = 14.0
+# 장치를 다시 여는 간격입니다. 실패가 이어지면 두 배씩 늘립니다.
+REOPEN_MIN_SEC, REOPEN_MAX_SEC = 1.0, 10.0
+# 기본 출력 장치가 바뀌었는지 이 간격으로 확인합니다.
+DEVICE_CHECK_SEC = 2.0
 
 ole32 = ctypes.windll.ole32
 
@@ -86,6 +94,16 @@ def _vcall(ptr, index, argtypes, *args):
 def _release(ptr):
     if ptr:
         _vcall(ptr, 2, [])  # IUnknown::Release
+
+
+def _device_id(device):
+    """IMMDevice 의 장치 ID 를 읽습니다."""
+    text = c_void_p()
+    _vcall(device, 5, [POINTER(c_void_p)], byref(text))  # IMMDevice::GetId
+    try:
+        return ctypes.wstring_at(text.value) if text.value else ""
+    finally:
+        ole32.CoTaskMemFree(text)
 
 
 def _sample_kind(fmt_ptr):
@@ -229,7 +247,7 @@ class AudioLevels(threading.Thread):
                 raise OSError("루프백 캡처를 시작하지 못했습니다 (0x%08x)"
                               % (hr & 0xFFFFFFFF))
             return (enumerator, device, client, capture, rate, channels, block,
-                    sample_kind)
+                    sample_kind, _device_id(device))
         except Exception:
             if fmt_ptr:
                 ole32.CoTaskMemFree(ctypes.cast(fmt_ptr, c_void_p))
@@ -238,6 +256,28 @@ class AudioLevels(threading.Thread):
             _release(device)
             _release(enumerator)
             raise
+
+    def _close(self, session):
+        """열어 둔 COM 객체를 모두 놓습니다."""
+        enumerator, device, client, capture = session[:4]
+        try:
+            _vcall(client, 11, [])  # Stop
+        except Exception:
+            pass
+        _release(capture)
+        _release(client)
+        _release(device)
+        _release(enumerator)
+
+    def _default_id(self, enumerator):
+        """지금 윈도우가 쓰는 기본 출력 장치의 ID 를 돌려줍니다."""
+        device = c_void_p()
+        # GetDefaultAudioEndpoint(eRender=0, eConsole=0)
+        _vcall(enumerator, 4, [c_uint, c_uint, POINTER(c_void_p)], 0, 0, byref(device))
+        try:
+            return _device_id(device)
+        finally:
+            _release(device)
 
     # ------------------------------------------------------------ 본체
 
@@ -248,49 +288,96 @@ class AudioLevels(threading.Thread):
             log("[소리] 시각화를 켜지 못했습니다: %s" % self.error)
             return
         try:
-            try:
-                (enumerator, device, client, capture, rate, channels, block,
-                 sample_kind) = self._open()
-            except Exception as exc:
-                self.error = str(exc)
-                log("[소리] 시각화를 켜지 못했습니다: %s" % exc)
-                return
-            self.available = True
-            _, edges, centers = band_edges(rate)
-            tilt = [TILT_DB * math.log2(c / 200.0) for c in centers]
-            detail("[소리] 시각화를 시작합니다 (%d Hz, %d 채널, %s)"
-                   % (rate, channels, sample_kind))
-
-            buf = []
-            data_ptr, frames, flags = c_void_p(), c_uint32(), c_uint32()
-            pos, qpc = c_uint64(), c_uint64()
-            period = 1.0 / self.fps
-            next_at = time.perf_counter()
-
-            try:
-                while not self.stop_event.is_set():
-                    self._drain(capture, buf, channels, block, sample_kind,
-                                data_ptr, frames, flags, pos, qpc)
-                    now = time.perf_counter()
-                    if now >= next_at and len(buf) >= N_FFT:
-                        next_at = now + period
-                        self._analyze(buf[-N_FFT:], edges, tilt)
-                    self.stop_event.wait(0.004)
-            except Exception as exc:
-                self.error = str(exc)
-                log("[소리] 시각화가 멈췄습니다: %s" % exc)
-            finally:
-                try:
-                    _vcall(client, 11, [])  # Stop
-                except Exception:
-                    pass
-                _release(capture)
-                _release(client)
-                _release(device)
-                _release(enumerator)
-                self.available = False
+            self._serve()
         finally:
             ole32.CoUninitialize()
+
+    def _serve(self):
+        """장치를 열어 캡처하다가 끊기거나 바뀌면 닫고 다시 엽니다.
+
+        실패는 처음 한 번만 기록합니다. 캡처가 실제로 이어진 뒤에야 되살아난
+        것으로 보므로, 열리자마자 끊기는 일이 되풀이되어도 기록이 쌓이지 않습니다.
+        """
+        delay = REOPEN_MIN_SEC
+        failing = False
+        reason = "start"
+        while not self.stop_event.is_set():
+            session, error, changed = None, None, False
+            try:
+                session = self._open()
+            except Exception as exc:
+                error = exc
+            if session is not None:
+                try:
+                    changed = self._capture(session, reason)
+                except Exception as exc:
+                    error = exc
+                finally:
+                    live = self.available
+                    self._close(session)
+                    self.available = False
+                    self.silent = True
+                    self.levels = [0.0] * BARS
+                if live:
+                    failing, delay = False, REOPEN_MIN_SEC
+            if error is not None:
+                self.error = str(error)
+                if not failing:
+                    failing = True
+                    if session is None:
+                        log("[소리] 시각화를 켜지 못했습니다: %s" % error)
+                    else:
+                        log("[소리] 시각화가 멈췄습니다: %s. 장치를 다시 열어 봅니다"
+                            % error)
+                reason = "failed"
+                if self.stop_event.wait(delay):
+                    break
+                delay = min(delay * 2, REOPEN_MAX_SEC)
+            elif changed:
+                reason = "changed"
+
+    def _capture(self, session, reason):
+        """캡처를 이어 갑니다. 기본 장치가 바뀌면 True, 멈추라 하면 False 입니다.
+
+        장치에서 오류가 나면 예외를 그대로 올립니다.
+        """
+        (enumerator, device, client, capture, rate, channels, block,
+         sample_kind, device_id) = session
+        _, edges, centers = band_edges(rate)
+        tilt = [TILT_DB * math.log2(c / 200.0) for c in centers]
+
+        buf = []
+        data_ptr, frames, flags = c_void_p(), c_uint32(), c_uint32()
+        pos, qpc = c_uint64(), c_uint64()
+        period = 1.0 / self.fps
+        next_at = time.perf_counter()
+        check_at = next_at + DEVICE_CHECK_SEC
+
+        while not self.stop_event.is_set():
+            self._drain(capture, buf, channels, block, sample_kind,
+                        data_ptr, frames, flags, pos, qpc)
+            if not self.available:
+                # 패킷을 한 번 꺼내 본 뒤에야 장치가 살아 있다고 봅니다.
+                self.available = True
+                self.error = ""
+                info = "%d Hz, %d 채널, %s" % (rate, channels, sample_kind)
+                if reason == "changed":
+                    detail("[소리] 기본 출력 장치가 바뀌어 새 장치로 다시 열었습니다 (%s)"
+                           % info)
+                elif reason == "failed":
+                    detail("[소리] 장치를 다시 열어 시각화를 이어 갑니다 (%s)" % info)
+                else:
+                    detail("[소리] 시각화를 시작합니다 (%s)" % info)
+            now = time.perf_counter()
+            if now >= next_at and len(buf) >= N_FFT:
+                next_at = now + period
+                self._analyze(buf[-N_FFT:], edges, tilt)
+            if now >= check_at:
+                check_at = now + DEVICE_CHECK_SEC
+                if self._default_id(enumerator) != device_id:
+                    return True
+            self.stop_event.wait(0.010)
+        return False
 
     def _drain(self, capture, buf, channels, block, sample_kind,
                data_ptr, frames, flags, pos, qpc):

@@ -106,4 +106,5 @@ def tell_already_running(title):
     if _user32 is None:
         return
     from .dialogs import show_message
-    show_message(title, "이미 실행 중입니다. 보조 디스플레이에 떠 있는 창을 확인하십시오.")
+    from .i18n import tr
+    show_message(title, tr("이미 실행 중입니다. 보조 디스플레이에 떠 있는 창을 확인하십시오."))

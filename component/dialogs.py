@@ -52,11 +52,8 @@ def title_bar(window, title, on_close):
 
 def place(window, parent, width):
     window.update_idletasks()
-    point = parent.winfo_pointerxy()
-    if parent.winfo_viewable():
-        point = (parent.winfo_rootx() + parent.winfo_width() // 2,
-                 parent.winfo_rooty() + parent.winfo_height() // 2)
-    rect = display.monitor_for_point(*point) or (0, 0, window.winfo_screenwidth(), window.winfo_screenheight())
+    # 본 창은 작은 보조 모니터에 떠 있으므로 팝업은 주 모니터 가운데에 띄웁니다.
+    rect = display.primary_rect() or (0, 0, window.winfo_screenwidth(), window.winfo_screenheight())
     left, top, screen_w, screen_h = rect
     width = min(width, screen_w - 20)
     height = min(window.winfo_reqheight(), screen_h - 20)

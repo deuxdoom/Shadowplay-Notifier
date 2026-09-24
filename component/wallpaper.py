@@ -13,7 +13,7 @@ from . import imaging, sky, version, weather, weather_icons
 from .atmosphere import Atmosphere
 from .audio import BARS
 from .i18n import date_text, tr, weekday, weekday_leads
-from .paths import log
+from .paths import RepeatedLog, log
 from .recording_view import STATUS_Y, RecordingLayer
 from .text import fit_text
 from .theme import (INK, INK_3, WALL_MONO_FAMILIES, WALL_UI_FAMILIES,
@@ -130,6 +130,9 @@ class WallpaperView:
         self._bake_key, self._wanted, self._future = None, None, None
         self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="wall-sky")
         self._baked_at = self._last_frame = self._data_at = 0
+        # 매 프레임 같은 예외가 나도 기록이 초당 30줄씩 쌓이지 않게 묶습니다.
+        self._draw_errors = RepeatedLog(60.0)
+        self._bar_parked = [False] * SPECTRUM_BARS
         self._levels = [0.] * BARS
         self._track_version = self._weather_version = -1
         self._last_second = None
@@ -798,10 +801,13 @@ class WallpaperView:
             x = self._bar_left + (self._bar_right - self._bar_left) * j / (SPECTRUM_BARS - 1)
             baseline = sky.horizon_y(x / self.width) * self.height
             if height < .3:
-                c.coords(bar, -10, -10, -10, -10)
-                c.coords(glow, -10, -10, -10, -10)
-                c.coords(reflection, -10, -10, -10, -10)
+                if not self._bar_parked[j]:
+                    self._bar_parked[j] = True
+                    c.coords(bar, -10, -10, -10, -10)
+                    c.coords(glow, -10, -10, -10, -10)
+                    c.coords(reflection, -10, -10, -10, -10)
                 continue
+            self._bar_parked[j] = False
             c.coords(bar, x, baseline - height, x, baseline)
             c.coords(glow, x, baseline - height, x, baseline)
             c.coords(reflection, x, baseline + 6 * s, x, baseline + 6 * s + height * .17)
@@ -838,7 +844,7 @@ class WallpaperView:
             if self._controls_visible and now - self._controls_at > 2.8 and self._hovered is None:
                 self._show_controls(False)
         except Exception as exc:
-            log("[월페이퍼] 그리다가 걸렸습니다: %s" % exc)
+            self._draw_errors.log("[월페이퍼] 그리다가 걸렸습니다: %s" % exc)
         elapsed = (time.perf_counter() - now) * 1000
         self._after_id = self.parent.after(max(1, self.period - round(elapsed)), self._tick)
 

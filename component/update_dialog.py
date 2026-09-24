@@ -92,7 +92,8 @@ class UpdateWindow:
 
     def recenter(self):
         self.window.update_idletasks()
-        rect = display.monitor_for_point(*self.center)
+        # 트레이를 누른 곳과 상관없이 사용자가 보고 있는 주 모니터 가운데에 띄웁니다.
+        rect = display.primary_rect()
         rect = rect or (0, 0, self.window.winfo_screenwidth(), self.window.winfo_screenheight())
         left, top, width, height = rect
         box_width = min(520, width - 24)
