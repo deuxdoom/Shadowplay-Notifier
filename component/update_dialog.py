@@ -13,7 +13,7 @@ from tkinter import ttk
 from . import dialogs, display, fonts, updater
 from . import update_windows as win
 from .i18n import tr
-from .paths import log
+from .paths import detail, log
 from .theme import C_BG, C_FIELD, C_FG, C_LINE, C_MUTED, C_SKY, pick_family
 from .version import VERSION
 
@@ -129,8 +129,29 @@ class UpdateController:
         self.after_id = None
         self.helper = None
         self.release = None
+        self.checking = False
+        self.startup_after_id = None
+        self.startup_checked = False
+        self.closed = False
+
+    def schedule_startup_check(self):
+        """첫 화면을 띄운 뒤 한 번만 조용히 확인합니다."""
+        if not self.closed and not self.startup_checked and self.startup_after_id is None:
+            self.startup_after_id = self.root.after(1200, self.check_on_startup)
+
+    def check_on_startup(self):
+        self.startup_after_id = None
+        if self.closed or self.startup_checked:
+            return
+        self.startup_checked = True
+        if self.view or self.checking or win.update_active():
+            return
+        self._start_check()
 
     def show(self):
+        if self.closed:
+            return
+        self.startup_checked = True
         if (self.helper and self.helper.poll() is None) or win.update_active():
             win.focus_update()
             return
@@ -139,13 +160,22 @@ class UpdateController:
             self.view.window.focus_force()
             return
         self.helper = None
-        self.generation += 1
-        generation = self.generation
+        self._make_view()
+        # 시작 시 확인이 진행 중이면 같은 결과를 이 창에 보여 줍니다.
+        if not self.checking:
+            self._start_check()
+
+    def _make_view(self):
         self.view = UpdateWindow(tk.Toplevel(self.root))
         self.view.window.protocol("WM_DELETE_WINDOW", self.dismiss)
         self.view.close_button.configure(command=self.dismiss)
         self.view.request_close = self.dismiss
         self.view.action.configure(command=self.begin)
+
+    def _start_check(self):
+        self.generation += 1
+        generation = self.generation
+        self.checking = True
         self.release = None
 
         def check():
@@ -153,7 +183,6 @@ class UpdateController:
                 result = updater.check_latest()
                 self.events.put((generation, "release", result))
             except Exception as exc:
-                log("[업데이트 확인] %s" % exc)
                 self.events.put((generation, "error", updater.error_text(exc)))
 
         threading.Thread(target=check, name="update-check", daemon=True).start()
@@ -161,7 +190,7 @@ class UpdateController:
 
     def poll(self):
         self.after_id = None
-        if not self.view:
+        if self.closed:
             return
         while True:
             try:
@@ -170,7 +199,18 @@ class UpdateController:
                 break
             if generation != self.generation:
                 continue
+            self.checking = False
+            if not self.view:
+                if kind == "error":
+                    detail("[시작 시 업데이트 확인] %s" % data)
+                    continue
+                if not data[0]:
+                    continue
+                if win.update_active():
+                    continue
+                self._make_view()
             if kind == "error":
+                log("[업데이트 확인] %s" % data)
                 self.view.result(tr("확인하지 못했습니다"), data)
                 self.view.action.configure(text=tr("다시 확인"), command=self.retry)
                 self.view.action.pack(side="right", padx=(0, 10))
@@ -186,7 +226,7 @@ class UpdateController:
                 else:
                     self.view.result(tr("최신 버전입니다"), tr("설치할 새 정식 버전이 없습니다."),
                                      tr("현재 %s  ·  GitHub 최신 %s") % (VERSION, tag))
-        if self.view:
+        if self.checking:
             self.after_id = self.root.after(100, self.poll)
 
     def retry(self):
@@ -259,6 +299,7 @@ class UpdateController:
         if getattr(self, "launching", False):
             return
         self.generation += 1
+        self.checking = False
         if self.after_id:
             self.root.after_cancel(self.after_id)
             self.after_id = None
@@ -268,6 +309,10 @@ class UpdateController:
             self.view = None
 
     def close(self):
+        self.closed = True
+        if self.startup_after_id is not None:
+            self.root.after_cancel(self.startup_after_id)
+            self.startup_after_id = None
         self.launching = False
         self.dismiss()
 

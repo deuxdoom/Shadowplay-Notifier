@@ -1,7 +1,7 @@
 """스피커로 나가는 소리를 받아 주파수 막대로 바꾸는 일입니다.
 
 윈도우의 WASAPI 루프백을 ``ctypes`` 로 직접 열어 출력 샘플을 읽고, 순수
-파이썬 FFT 로 12대역 세기를 구합니다. 외부 패키지를 쓰지 않습니다.
+파이썬 FFT 로 24대역 세기를 구합니다. 외부 패키지를 쓰지 않습니다.
 
 소리를 녹음하는 것이 아니라 세기만 재며, 어디에도 저장하지 않습니다.
 녹화가 시작되면 :meth:`AudioLevels.stop` 으로 장치를 닫습니다.
@@ -24,7 +24,7 @@ from ctypes import POINTER, byref, c_uint, c_uint32, c_uint64, c_void_p
 
 from .paths import detail, log
 
-BARS = 12
+BARS = 24
 N_FFT = 1024
 LOW_HZ, HIGH_HZ = 40.0, 16000.0
 # 음악은 저역 에너지가 크므로 옥타브마다 이만큼 올려 준다
@@ -157,19 +157,24 @@ def fft(values):
 
 
 def band_edges(rate):
-    """40 Hz 부터 16 kHz 까지를 로그 간격으로 12등분해 FFT 칸 번호로 바꿉니다."""
+    """주파수를 24대역으로 나누되 각 FFT 칸은 한 대역에만 넣습니다."""
     bin_hz = rate / N_FFT
-    hz = [LOW_HZ * (HIGH_HZ / LOW_HZ) ** (i / BARS) for i in range(BARS + 1)]
-    edges = [int(round(h / bin_hz)) for h in hz]
-    for i in range(1, len(edges)):
-        if edges[i] <= edges[i - 1]:
-            edges[i] = edges[i - 1] + 1
+    high_hz = min(HIGH_HZ, rate / 2)
+    hz = [LOW_HZ * (high_hz / LOW_HZ) ** (i / BARS) for i in range(BARS + 1)]
+    limit = min(N_FFT // 2, round(high_hz / bin_hz))
+    edges = [max(1, min(round(hz[0] / bin_hz), limit - BARS))]
+    for i in range(1, BARS + 1):
+        # 저역은 FFT 해상도보다 촘촘히 나눌 수 없습니다. 중복 대역을
+        # 만드는 대신 최소 한 칸을 배정하고, 뒤 대역이 쓸 칸도 남깁니다.
+        edges.append(max(edges[-1] + 1,
+                         min(round(hz[i] / bin_hz), limit - (BARS - i))))
+    hz = [edge * bin_hz for edge in edges]
     centers = [math.sqrt(hz[i] * hz[i + 1]) for i in range(BARS)]
     return hz, edges, centers
 
 
 class AudioLevels(threading.Thread):
-    """출력 소리를 받아 12대역 세기를 계속 갱신하는 스레드입니다.
+    """출력 소리를 받아 24대역 세기를 계속 갱신하는 스레드입니다.
 
     화면 쪽에서는 :attr:`levels` 를 그대로 읽어 씁니다. 값은 0~1 입니다.
     장치를 열지 못하면 조용히 물러나고 :attr:`available` 이 False 가 됩니다.

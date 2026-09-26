@@ -152,6 +152,7 @@ def main(argv=None):
         root.after(300, grab_focus)
 
     supervisor.start(settings)
+    updates.schedule_startup_check()
     updater.schedule_cleanup()
     app.add_log("[시작] 감시를 시작했습니다.", "", "감시를 시작했습니다")
     log("앱 시작 %s  감시: %s" % (version.VERSION,

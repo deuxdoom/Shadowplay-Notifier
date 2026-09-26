@@ -7,11 +7,13 @@
 import math
 import time
 import tkinter as tk
+import webbrowser
 from concurrent.futures import ThreadPoolExecutor
 
 from . import imaging, sky, version, weather, weather_icons
 from .atmosphere import Atmosphere
 from .audio import BARS
+from .github_icon import MARK_SVG, PROJECT_URL
 from .i18n import date_text, tr, weekday, weekday_leads
 from .paths import RepeatedLog, log
 from .recording_view import STATUS_Y, RecordingLayer
@@ -22,7 +24,7 @@ from .theme import (INK, INK_3, WALL_MONO_FAMILIES, WALL_UI_FAMILIES,
 BASE_W, BASE_H = 960, 640
 COVER_SIZE = 112
 WICON_SIZE = 128
-SPECTRUM_BARS = 64
+SPECTRUM_BARS = BARS
 # 보조 정보 왼쪽에 놓는 달의 지름입니다.
 MOON_SIZE = 70
 # 월페이퍼 글자입니다. **어느 시간대에나 흰색으로 씁니다.** 보조 디스플레이가
@@ -120,6 +122,8 @@ class WallpaperView:
         self.audio = self.nowplaying = self.weather = None
         self._bg_image = self._cover_image = self._wicon_image = None
         self._moon_image, self._moon_key = None, None
+        self._github_image = None
+        self._github_size = None
         self._moon_slot = None
         self._weather_icon_key = None
         self._weather_motion = ""
@@ -273,6 +277,7 @@ class WallpaperView:
         self.status_ver = self._text(self._font("statusver", -16,
                                                 WALL_MONO_FAMILIES), "#5a6478",
                                      text=version.label(), anchor="e")
+        self.github_item = c.create_image(0, 0, anchor="e")
         self._tag_wallonly()
         self.tooltip = self._text(self._font("tooltip", -13), WALL_INK_2,
                                   anchor="e", tag="controls")
@@ -320,8 +325,8 @@ class WallpaperView:
         self._track_width = max(1, right - self._track_x)
         self._bar_left, self._bar_right = x, right
         self._bar_y, self._bar_height = 453 * sy, 72 * s
-        for group, width in ((self.bar_items, 4), (self.bar_glows, 8),
-                             (self.reflection_items, 3)):
+        for group, width in ((self.bar_items, 6), (self.bar_glows, 10),
+                             (self.reflection_items, 4)):
             for item in group:
                 c.itemconfigure(item, width=max(1, width * s))
         # 구분선을 빼고 사이 간격만으로 나눕니다. 선이 차지하던 자리를
@@ -566,7 +571,7 @@ class WallpaperView:
         room = right - (self._weather_center[0] + WICON_SIZE * s / 2) - 8 * s
         font = self._fonts["city"][0]
         self.canvas.itemconfigure(self.city_item, text=fit_text(
-            self._city_text, font, int(max(40 * s, room))))
+            self._city_text.upper(), font, int(max(40 * s, room))))
         # 기온은 글자가 길면 스스로 작아지므로 그 실제 높이를 재서 바로 위에
         # 붙입니다. 고정 좌표로 두면 기온에 따라 간격이 들쭉날쭉해집니다.
         top = (self._weather_center[1]
@@ -579,6 +584,29 @@ class WallpaperView:
         self.recording.place(self.width, self.scale_x, self.scale_y, self.scale)
         self.canvas.coords(self.status_ver, self.width - 60 * self.scale_x,
                            STATUS_Y * self.scale_y)
+        self._place_github()
+
+    def _place_github(self):
+        size = max(12, round(18 * self.scale))
+        if size != self._github_size:
+            svg = MARK_SVG.replace('<path ', '<path fill="#77839a" ')
+            new = tk.PhotoImage(master=self.parent, data=svg,
+                                format="svg -scaletowidth %d" % size)
+            old, self._github_image = self._github_image, new
+            self._github_size = size
+            self.canvas.itemconfigure(self.github_item, image=new)
+            _drop_image(self.parent, old)
+        right, y = self.canvas.coords(self.status_ver)
+        text = self.canvas.itemcget(self.status_ver, "text")
+        left = right - self._fonts["statusver"][0].measure(text)
+        self.canvas.coords(self.github_item, left - 8 * self.scale, y)
+
+    def _hit_github(self, x, y):
+        box = self.canvas.bbox(self.github_item)
+        right, cy = self.canvas.coords(self.status_ver)
+        pad = 6 * self.scale
+        return bool(box and box[0] - pad <= x <= right + pad
+                    and abs(y - cy) <= max(14 * self.scale, 12))
 
     # ------------------------------------------------------------ 화면 갈아 끼우기
 
@@ -630,6 +658,7 @@ class WallpaperView:
         """
         self.recording.set_status(text)
         self.canvas.itemconfigure(self.status_ver, text=label)
+        self._place_github()
 
     def set_sources(self, audio=None, nowplaying=None, weather=None):
         """자료를 대는 스레드를 갈아 끼웁니다.
@@ -681,10 +710,11 @@ class WallpaperView:
         self._destroyed = True
         self._executor.shutdown(wait=False, cancel_futures=True)
         for photo in (self._bg_image, self._cover_image, self._wicon_image,
-                      self._moon_image):
+                      self._moon_image, self._github_image):
             _drop_image(self.parent, photo)
         self._bg_image = self._cover_image = self._wicon_image = None
         self._moon_image, self._moon_key = None, None
+        self._github_image, self._github_size = None, None
         self._moon_slot = None
         self._bg_pixels = self._fade_source = self._fade_target = None
         self._cover_data = self._wanted = self._future = None
@@ -793,11 +823,9 @@ class WallpaperView:
         c, s = self.canvas, self.scale
         for j, (bar, glow, reflection) in enumerate(zip(
                 self.bar_items, self.bar_glows, self.reflection_items)):
-            pos = j * (BARS - 1) / (SPECTRUM_BARS - 1)
-            i, f = min(BARS - 2, int(pos)), pos - min(BARS - 2, int(pos))
-            level = self._levels[i] * (1 - f) + self._levels[i + 1] * f
-            edge = math.sin(math.pi * (j + 1) / (SPECTRUM_BARS + 1)) ** .45
-            height = level ** .72 * self._bar_height * edge
+            # 한 막대가 한 실측 대역을 따릅니다. 이웃 값을 섞거나
+            # 양 끝을 낮추는 장식 곡선을 씌우지 않습니다.
+            height = self._levels[j] ** .72 * self._bar_height
             x = self._bar_left + (self._bar_right - self._bar_left) * j / (SPECTRUM_BARS - 1)
             baseline = sky.horizon_y(x / self.width) * self.height
             if height < .3:
@@ -810,7 +838,10 @@ class WallpaperView:
             self._bar_parked[j] = False
             c.coords(bar, x, baseline - height, x, baseline)
             c.coords(glow, x, baseline - height, x, baseline)
-            c.coords(reflection, x, baseline + 6 * s, x, baseline + 6 * s + height * .17)
+            reflection_height = min(height * .17,
+                                    max(0, self._cover_xy[1] - baseline - 14 * s))
+            c.coords(reflection, x, baseline + 6 * s,
+                     x, baseline + 6 * s + reflection_height)
 
     def _tick(self):
         self._after_id = None
@@ -1243,10 +1274,16 @@ class WallpaperView:
         labels = {"settings": tr("환경설정"), "full": tr("전체화면 · F11"),
                   "close": tr("트레이로 이동")}
         self.canvas.itemconfigure(self.tooltip, text=labels.get(self._hovered, ""))
-        over = self._hovered or self._hit_clock(event.x, event.y)
+        over = (self._hovered or self._hit_clock(event.x, event.y)
+                or self._hit_github(event.x, event.y))
         self.canvas.configure(cursor="hand2" if over else "")
 
     def _click(self, event):
+        if self._hit_github(event.x, event.y):
+            self._pressed_control = True
+            self._pressed_clock = None
+            webbrowser.open(PROJECT_URL)
+            return "break"
         hit = self._hit_control(event.x, event.y)
         self._pressed_control = hit is not None
         if hit:
@@ -1306,4 +1343,3 @@ def _drop_image(parent, image):
             parent.tk.call("image", "delete", str(image))
         except tk.TclError:
             pass
-

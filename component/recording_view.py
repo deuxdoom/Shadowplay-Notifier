@@ -197,7 +197,8 @@ class RecordingLayer:
     def set_status(self, text):
         """맨 아래 한 줄입니다. 감시 폴더와 주기, 갱신 시각, 세션 누적을 적습니다."""
         font = self.fonts["status"][0]
-        room = int(self.width - 120 * self.scale_x - 90 * self.scale)
+        # 오른쪽의 GitHub 아이콘과 버전 표시 공간을 남깁니다.
+        room = int(self.width - 120 * self.scale_x - 120 * self.scale)
         self.canvas.itemconfigure(self.status_item, text=fit_text(text, font, room))
 
     def pulse(self, now):
