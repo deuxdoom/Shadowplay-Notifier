@@ -3,7 +3,7 @@
 이 파일의 형식은 [Keep a Changelog 1.1.0](https://keepachangelog.com/ko/1.1.0/)을
 따르며, 버전은 [유의적 버전 2.0.0](https://semver.org/lang/ko/)을 따릅니다.
 
-## [2.6.0] - 배포 예정
+## [2.6.0] - 2026-09-27
 
 ### 새 기능
 
