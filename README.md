@@ -1,20 +1,17 @@
 # 🎬 ShadowPlay Notifier
 
 [![RELEASE](https://img.shields.io/github/release/deuxdoom/Shadowplay-Notifier?style=flat&logo=github&logoColor=white&label=RELEASE&labelColor=2f353a&color=0ea5e9)](https://github.com/deuxdoom/Shadowplay-Notifier/releases/latest)
-[![Downloads Latest](https://img.shields.io/github/downloads/deuxdoom/Shadowplay-Notifier/latest/total?logo=github&style=flat&label=DOWNLOADS@LATEST&labelColor=2f353a)](https://github.com/deuxdoom/Shadowplay-Notifier/releases/latest)
 [![Downloads Total](https://img.shields.io/github/downloads/deuxdoom/Shadowplay-Notifier/total?logo=github&style=flat&label=DOWNLOADS&labelColor=2f353a)](https://github.com/deuxdoom/Shadowplay-Notifier/releases)
-[![LICENSE](https://img.shields.io/badge/LICENSE-MIT-22c55e?style=flat&labelColor=2f353a)](LICENSE)  
+[![LICENSE](https://img.shields.io/badge/LICENSE-FREEWARE-22c55e?style=flat&labelColor=2f353a)](LICENSE)\
 [![Platform](https://img.shields.io/badge/PLATFORM-WINDOWS%2010%2F11-0078d4?style=flat&logo=windows&logoColor=white&labelColor=2f353a)](https://github.com/deuxdoom/Shadowplay-Notifier)
-[![PYTHON](https://img.shields.io/badge/PYTHON-3.14%2B-3776ab?style=flat&logo=python&logoColor=white&labelColor=2f353a)](https://www.python.org/)
-[![TKINTER](https://img.shields.io/badge/GUI-TKINTER-f59e0b?style=flat&logoColor=white&labelColor=2f353a)](https://docs.python.org/3/library/tkinter.html)
 [![NVIDIA](https://img.shields.io/badge/FOR-NVIDIA%20SHADOWPLAY-76b900?style=flat&logo=nvidia&logoColor=white&labelColor=2f353a)](https://www.nvidia.com/geforce/nvidia-app/)
 
 <p align="center">
-  <img src="main.png" alt="녹화 중인 화면" width="100%">
+  <img src="assets/main.png" alt="녹화 중인 화면" width="100%">
 </p>
 
 <p align="center">
-  <img src="wallpaper.png" alt="월페이퍼 화면" width="100%">
+  <img src="assets/wallpaper.png" alt="월페이퍼 화면" width="100%">
 </p>
 
 <p align="center">
@@ -86,7 +83,8 @@ NVIDIA App 의 녹화 상태 아이콘이 영상에 그대로 찍히는 것이 �
 - **트레이에서 계속 실행** — 창을 닫으면 알림 영역으로 들어갑니다. 창을 숨기는 동안에는
   월페이퍼 렌더링과 음악·날씨 조회를 쉬고 녹화 감시만 이어 갑니다.
 - **세 가지 말** — 한국어·영어·일본어 가운데 화면에 쓸 말을 고릅니다. 월페이퍼와
-  녹화 화면, 트레이 메뉴, 모든 팝업이 함께 바뀌며 기본값은 한국어입니다.
+  녹화 화면, 트레이 메뉴, 모든 팝업이 함께 바뀌며 기본값은 한국어입니다. 이미 올라간
+  이벤트 로그 줄까지 곧바로 새 말로 바뀝니다.
 - **윈도우 시작 시 실행** — 트레이 메뉴에서 켜 두면 다음 로그인부터 자동으로 실행됩니다.
 - **앱에서 업데이트** — 시작 시 새 정식 버전이 있는지 자동으로 확인하고, 새 버전이
   있을 때만 안내합니다. 업데이트 버튼을 누르면 같은 폴더에 설치한 뒤 다시 실행합니다.
@@ -106,6 +104,9 @@ NVIDIA App 의 녹화 상태 아이콘이 영상에 그대로 찍히는 것이 �
 
 **Windows 10 이상**에서 사용합니다. 설정과 기록은 실행 파일 옆에 `config.json` 과
 `monitor.log` 로 남으므로, 쓰기가 되는 폴더에 두십시오.
+
+**공식 배포처는 이 저장소의 [Releases](https://github.com/deuxdoom/Shadowplay-Notifier/releases) 하나뿐입니다.**
+다른 곳에 올라온 파일은 변조되었을 수 있으니 받지 마십시오.
 
 **2.4.0부터는** 트레이 우클릭 → **최신 버전 확인** → **업데이트**로 갱신합니다.
 GitHub의 최신 정식 릴리스를 확인하므로 2.4.1, 2.5.0, 3.0.0처럼 버전이 바뀌어도
@@ -145,8 +146,8 @@ EXE를 교체해 다시 실행합니다. 터미널 창은 뜨지 않으며 설�
 
 **직접 확인하시려면** [VirusTotal](https://www.virustotal.com/) 에 파일을 올려 보십시오.
 수십 개 엔진 가운데 몇 개만 반응하고 진단명이 `Heur`, `Generic`, `Wacatac` 처럼
-휴리스틱 계열이면 오탐입니다. 코드 전체가 이 저장소에 있으므로 읽어 보시거나 직접
-빌드하셔도 됩니다.
+휴리스틱 계열이면 오탐입니다. 릴리스 페이지에 적힌 SHA-256 과 내려받은 파일의 값이
+같은지도 함께 확인하십시오.
 
 **계속 쓰시려면** 백신의 제외(신뢰) 목록에 실행 파일이나 그 폴더를 넣으십시오.
 윈도우 보안은 `바이러스 및 위협 방지 → 설정 관리 → 제외 추가 또는 제거` 에서 넣고,
@@ -204,17 +205,14 @@ EXE를 교체해 다시 실행합니다. 터미널 창은 뜨지 않으며 설�
 
 ## 📜 라이선스
 
-이 프로젝트는 **MIT 라이선스**를 따릅니다. 전문은 [LICENSE](LICENSE)에 있습니다.
-Copyright (c) 2026 deuxdoom
+ShadowPlay Notifier 는 **무료로 쓰는 프리웨어**이며 소스 코드는 공개하지 않습니다.
+Copyright (c) 2026 deuxdoom. All rights reserved.
 
-- 하단 GitHub 아이콘은 [GitHub Octicons](https://github.com/primer/octicons)의
-  `mark-github-16`이며 MIT 라이선스를 따릅니다. 원문은 [아이콘 소스](component/github_icon.py)에 포함했습니다.
-- 아이콘은 Microsoft 의 [Fluent UI System Icons](https://github.com/microsoft/fluentui-system-icons)
-  에서 가져왔습니다(MIT).
-- 사계절 사진은 [Unsplash](https://unsplash.com/) 에서 가져왔으며
-  [Unsplash License](https://unsplash.com/license)를 따릅니다. 사진을 갈아 끼우는 방법은
-  [사진 출처](assets/wallpapers/README.md)에 적어 두었습니다.
-- 글꼴은 [Pretendard](https://github.com/orioncactus/pretendard) 와
-  [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) 이며 둘 다 SIL Open
-  Font License 1.1 을 따릅니다. 프로그램이 돌아가는 동안에만 등록되고 윈도우에
-  설치되지 않습니다.
+- 공식 배포처에서 받은 실행 파일은 개인이든 업무든 용도에 관계없이 무료로 쓸 수 있습니다.
+- 허락 없이 고치거나 역설계할 수 없고, 실행 파일을 다른 곳에 올리거나 판매하는 등 상업적으로 배포하는 것은 금지합니다.
+  공식 배포처의 링크를 알리는 것은 자유입니다.
+- 자세한 조건은 [LICENSE](LICENSE)에 있습니다.
+
+함께 담은 아이콘(GitHub Octicons, Microsoft Fluent UI System Icons)과 글꼴(Pretendard,
+JetBrains Mono), 사계절 사진(Unsplash)은 각자의 라이선스를 따릅니다. 출처와 원문은
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)에 모아 두었습니다.

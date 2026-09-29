@@ -1,21 +1,90 @@
-MIT License
+ShadowPlay Notifier 사용 허락 조건 (프리웨어)
 
-Copyright (c) 2026 deuxdoom
+Copyright (c) 2026 deuxdoom. All rights reserved.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+ShadowPlay Notifier(실행 파일과 그 안에 든 코드·그림·자료, 그리고 이 저장소의
+문서를 모두 포함하며, 아래에서 「이 소프트웨어」라고 합니다)의 저작권은
+deuxdoom 에게 있습니다.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+1. 허락하는 것
+   공식 배포처(https://github.com/deuxdoom/Shadowplay-Notifier/releases)에서 받은
+   실행 파일을 개인 용도든 업무 용도든 관계없이 무료로 설치하고 쓸 수 있습니다.
+   공식 배포처의 주소를 다른 사람에게 알리거나 소개하는 것도 자유입니다.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+2. 허락하지 않는 것
+   저작권자에게 미리 서면으로 허락을 받지 않고는 다음을 할 수 없습니다.
+   가. 이 소프트웨어를 고치거나 바꾸거나, 이를 바탕으로 2차적 저작물을 만드는 일
+   나. 역컴파일·디컴파일·역설계를 하거나, 실행 파일에서 코드나 자료를 뽑아내는 일
+       (적용되는 법률이 이 제한과 관계없이 허용하는 범위는 예외입니다)
+   다. 이 소프트웨어를 공식 배포처가 아닌 곳에 다시 올리거나, 배포·판매·대여하거나,
+       다른 프로그램이나 묶음에 넣어 배포하는 일
+   라. 저작권 표시나 이 조건을 지우거나 가리는 일, 이 소프트웨어를 자신이 만든
+       것처럼 내세우는 일
+
+3. 다른 사람의 저작물
+   이 소프트웨어에 함께 담은 아이콘·글꼴·사진은 각 저작권자의 라이선스를 따르며,
+   이 조건이 그 라이선스를 제한하지 않습니다. 출처와 원문은
+   THIRD-PARTY-NOTICES.md 에 있습니다.
+
+4. 보증하지 않음
+   이 소프트웨어는 「있는 그대로」 제공됩니다. 상품성, 특정 목적에의 적합성,
+   권리 비침해를 비롯해 명시적이든 묵시적이든 어떤 보증도 하지 않습니다.
+
+5. 책임의 한계
+   법률이 허용하는 최대한의 범위에서, 저작권자는 이 소프트웨어를 쓰거나 쓰지
+   못해서 생긴 어떤 손해에도 책임을 지지 않습니다.
+
+6. 허락의 종료
+   위 조건을 어기면 이 허락은 바로 끝나며, 그때에는 이 소프트웨어를 지우고 더
+   쓰지 않아야 합니다.
+
+문의: https://github.com/deuxdoom/Shadowplay-Notifier/issues
+
+--------------------------------------------------------------------------------
+
+ShadowPlay Notifier License (Freeware)
+
+Copyright (c) 2026 deuxdoom. All rights reserved.
+
+ShadowPlay Notifier, including the executable, all code, images and data
+contained in it, and the documentation in this repository (the "Software"),
+is owned by deuxdoom.
+
+1. Permitted use
+   You may install and use the executable obtained from the official
+   distribution page (https://github.com/deuxdoom/Shadowplay-Notifier/releases)
+   free of charge, for personal or business purposes. You may freely share the
+   address of the official distribution page.
+
+2. Restrictions
+   Without prior written permission from the copyright holder, you may not:
+   a. modify, adapt or alter the Software, or create derivative works based on it;
+   b. decompile, disassemble or reverse engineer the Software, or extract code or
+      data from the executable, except to the extent applicable law expressly
+      permits this despite this restriction;
+   c. redistribute, republish, sell, rent or lend the Software, upload it
+      anywhere other than the official distribution page, or bundle it with
+      other software or packages;
+   d. remove or obscure any copyright notice or these terms, or present the
+      Software as your own work.
+
+3. Third-party components
+   Icons, fonts and photographs bundled with the Software remain under the
+   licenses of their respective owners, and these terms do not restrict those
+   licenses. Sources and license texts are listed in THIRD-PARTY-NOTICES.md.
+
+4. No warranty
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+
+5. Limitation of liability
+   TO THE MAXIMUM EXTENT PERMITTED BY LAW, IN NO EVENT SHALL THE COPYRIGHT
+   HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY ARISING FROM, OUT
+   OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR INABILITY TO USE IT.
+
+6. Termination
+   This permission ends automatically if you breach any of these terms. You
+   must then delete the Software and stop using it.
+
+Contact: https://github.com/deuxdoom/Shadowplay-Notifier/issues
