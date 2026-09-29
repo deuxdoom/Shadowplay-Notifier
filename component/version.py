@@ -1,7 +1,7 @@
 """프로그램 버전입니다. 배포할 때 이 값만 고치면 됩니다.
 
 - 창 오른쪽 아래와 창 제목에 그대로 나옵니다.
-- GitHub 에 올릴 때는 같은 값으로 태그를 답니다. 예: ``git tag v1.0.0``
+- GitHub 에 올릴 때는 같은 값으로 태그를 답니다. 예: ``git tag 1.0.0``
 - 바꾼 내용은 저장소의 CHANGELOG.md 에 함께 적습니다.
 
 번호는 major.minor.patch 로 세 자리를 씁니다.
@@ -12,13 +12,17 @@
 """
 
 APP_NAME = "ShadowPlay Notifier"
-VERSION = "2.6.0"
+VERSION = "2.7.0"
 AUTHOR = "deuxdoom"
 
 
 def label():
-    """화면에 표시할 짧은 버전 문구입니다."""
-    return "v" + VERSION
+    """화면에 표시할 짧은 버전 문구입니다.
+
+    앞에 ``v`` 를 붙이지 않고 숫자만 씁니다(2.7.0, 사용자 지시). 소개 페이지와
+    태그도 숫자만 씁니다.
+    """
+    return VERSION
 
 
 def title():

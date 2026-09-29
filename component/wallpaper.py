@@ -738,16 +738,22 @@ class WallpaperView:
             return
         now = time.perf_counter()
         palette = sky.blend_palette(_now_hour())
-        palette["recording"] = self._mode == "rec"
-        key = (self.width, self.height, tuple(palette["sky"]), palette["glow"],
-               self._sky_key, self._accent, palette["season"],
-               round(palette["light"], 4), round(palette["veil"], 4), self._mode)
+        recording = palette["recording"] = self._mode == "rec"
+        if recording:
+            # 녹화 화면은 계절 사진에 같은 색만 입히므로(sky._recording) 곡이나
+            # 날씨, 시각이 바뀌어도 다시 구울 까닭이 없습니다.
+            accent, group = None, "clear"
+            key = (self.width, self.height, palette["season"], self._mode)
+        else:
+            accent, group = self._accent, self._sky_key
+            key = (self.width, self.height, tuple(palette["sky"]), palette["glow"],
+                   group, accent, palette["season"],
+                   round(palette["light"], 4), round(palette["veil"], 4), self._mode)
         self._baked_at = now
         if not force and key == self._bake_key:
             return
         self._bake_key = key
-        self._wanted = (key, palette, self.width, self.height,
-                        self._accent, self._sky_key)
+        self._wanted = (key, palette, self.width, self.height, accent, group)
         self._submit_sky()
 
     def _submit_sky(self):

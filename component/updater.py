@@ -102,7 +102,9 @@ def error_text(exc):
         return tr("연결이 끊겼거나 응답이 없습니다. 인터넷 연결을 확인하고 다시 시도해 주세요.")
     if isinstance(exc, PermissionError):
         return tr("설치 폴더에 쓰거나 파일을 교체할 수 없습니다. 폴더 권한과 실행 파일 차단 여부를 확인해 주세요.")
-    return str(exc)
+    # update_windows 가 내는 오류는 기록에 한국어로 남도록 원문으로 던지고,
+    # 화면에 적는 여기에서 옮깁니다. 사전에 없는 OS 문구는 그대로 나옵니다.
+    return tr(str(exc))
 
 
 def check_latest(current=VERSION):

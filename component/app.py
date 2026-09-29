@@ -209,6 +209,8 @@ class MonitorApp:
             i18n.set_language(settings.get("language"))
             if self.wallpaper is not None:
                 self.wallpaper.refresh_language()
+                # 이벤트 로그는 원문으로 들고 있으므로 다시 적으면 새 말로 바뀝니다.
+                self.wallpaper.set_log(list(self.log_rows))
         # 도시 이름처럼 화면이 들고 있는 값을 새것으로 갈아 끼웁니다. 캔버스를
         # 새로 만들지는 않으므로, 여기에서 알려 주지 않으면 옛 값이 그대로 남습니다.
         if self.wallpaper is not None:
@@ -224,10 +226,10 @@ class MonitorApp:
             # 빠지고 시작 기록은 겹칩니다. 그래서 마지막 설정 하나만 들고 있다가
             # 녹화가 끝날 때 한 번 다시 시작합니다.
             self._pending_watch = settings
-            self.add_log(tr("[설정] 녹화가 끝나면 새 설정으로 감시를 다시 시작합니다."))
+            self.add_log("[설정] 녹화가 끝나면 새 설정으로 감시를 다시 시작합니다.")
         else:
             self._pending_watch = None
-            self.add_log(tr("[설정] 환경설정을 저장하고 감시를 다시 시작했습니다."))
+            self.add_log("[설정] 환경설정을 저장하고 감시를 다시 시작했습니다.")
             self._restart_watch(settings)
         self._refresh_status()
 
@@ -378,9 +380,11 @@ class MonitorApp:
     def add_log(self, text, kind="", detail=""):
         """이벤트 로그에 한 줄 올립니다.
 
-        ``kind`` 는 색을 고르는 데 쓰는 한국어 원문(``시작``·``중단``)이며,
+        ``kind`` 는 색을 고르는 데 쓰는 한국어 원문(``시작``·``중단``·``오류``)이며,
         화면에 적을 때에만 쓰는 말로 옮깁니다. ``detail`` 을 주면 그것을 적고
-        없으면 ``text`` 를 그대로 적습니다.
+        없으면 ``text`` 를 적습니다. 둘 다 옮기지 않은 한국어 원문이나
+        ``(틀, 값, ...)`` 으로 주십시오. 적을 때마다 옮기므로(:func:`i18n.phrase`)
+        실행 중에 쓰는 말을 바꿔도 이미 올라간 줄까지 따라 바뀝니다.
         """
         self.log_rows.appendleft(
             (time.strftime("%H:%M:%S"), kind, detail or text))
@@ -425,8 +429,8 @@ class MonitorApp:
             self.add_log("[시작] " + shown, "시작", shown)
         elif kind == "stop":
             self.session_count += 1
-            self.add_log("[중단]", "중단", "%s · %s · %s" % (
-                tr(event.get("reason", "")), hms(event["dur"]),
+            self.add_log("[중단]", "중단", (
+                "%s · %s · %s", event.get("reason", ""), hms(event["dur"]),
                 human(event["peak"])))
             self._set_recording(False)
         elif kind == "health":
@@ -435,7 +439,11 @@ class MonitorApp:
                             + ellipsize(", ".join(missing), 48)) if missing else ""
             self._refresh_status()
         elif kind == "error":
-            self.add_log("[오류] " + str(event.get("message", "")))
+            # ``reason`` 은 옮길 수 있는 한국어 원문이고 ``message`` 는 예외 문구입니다.
+            reason = event.get("reason", "")
+            message = str(event.get("message", ""))
+            self.add_log("[오류] " + message, "오류",
+                         ("%s: %s", reason, message) if reason else message)
 
     def _drain(self):
         try:

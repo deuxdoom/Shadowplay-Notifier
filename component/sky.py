@@ -69,6 +69,7 @@ SLOTS = (("심야", "MIDNIGHT"), ("새벽", "DAWN"), ("오전", "MORNING"),
          ("낮", "DAYLIGHT"), ("오후", "AFTERNOON"), ("저녁", "EVENING"))
 
 # 녹화 화면입니다. 붉은 표시가 사진에 묻히지 않도록 가장 어둡게 깔아 둡니다.
+# 시간대·날씨·음악과 상관없이 화면 전체에 고르게 입힙니다(:func:`_recording`).
 REC_GRADE = (.26, (11, 17, 30), .66)
 
 # 화면에서 가장 밝은 곳이 넘어서는 안 되는 휘도입니다. 월페이퍼 글자 가운데
@@ -215,9 +216,8 @@ def render(width, height, palette, accent=None, group="clear"):
     aspect = round(max(.125, min(8., width / max(1, height))), 4)
     photo = _photo(palette["season"], aspect)
     if palette.get("recording"):
-        light, tint, veil = REC_GRADE
-    else:
-        light, tint, veil = palette["light"], palette["glow"], palette["veil"]
+        return _recording(photo)
+    light, tint, veil = palette["light"], palette["glow"], palette["veil"]
     # 계절의 기운은 밝은 시간대에만 아주 옅게 섞습니다. 많이 섞으면 사진이
     # 그 색으로 물들고, 밤에 섞으면 남색이 흐려집니다.
     tone = (tint[0] * .2126 + tint[1] * .7152 + tint[2] * .0722) / 255
@@ -254,6 +254,24 @@ def render(width, height, palette, accent=None, group="clear"):
         output[j + 1] = 255 if green > 255 else (0 if green < 0 else round(green))
         output[j + 2] = 255 if blue > 255 else (0 if blue < 0 else round(blue))
         j += 3
+    return bytes(output)
+
+
+def _recording(photo):
+    """녹화 화면은 사진 한 장에 :data:`REC_GRADE` 만 고르게 입힙니다.
+
+    시간대·계절 기운·날씨·음악과 상관없이 화면 전체가 같은 어두운 남색이어야
+    붉은 녹화 표시가 묻히지 않습니다. 그래서 월페이퍼의 음악 자리(아래쪽 바닥,
+    앨범 색 번짐, 지평선 빛)도 칠하지 않습니다. 2.7.0 전에는 이것들이 남아
+    녹화 화면 아래쪽이 듣던 곡의 커버 색으로 물들어 보였습니다.
+    """
+    light, tint, veil = REC_GRADE
+    output = bytearray(len(photo))
+    # 자리와 상관없는 셈이므로 채널마다 256칸 표를 만들어 한 번에 바꿉니다.
+    for k in range(3):
+        table = bytes(min(255, max(0, round(p * light * (1 - veil) + tint[k] * veil)))
+                      for p in range(256))
+        output[k::3] = bytes(photo[k::3]).translate(table)
     return bytes(output)
 
 

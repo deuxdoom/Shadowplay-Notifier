@@ -139,7 +139,8 @@ class WatchThread(threading.Thread):
             w.prime()
         except Exception as exc:
             log("[오류] 초기 스캔에 실패했습니다: %s" % exc)
-            w.emit(kind="error", message="초기 스캔 실패: %s" % exc)
+            # 화면이 쓰는 말로 옮길 수 있게 원문(reason)과 예외 문구를 나누어 보냅니다.
+            w.emit(kind="error", reason="초기 스캔 실패", message=str(exc))
         while not self.stop_event.is_set():
             w.emit(kind="health",
                    missing=[d for d in w.dirs if not os.path.isdir(d)])

@@ -12,7 +12,7 @@ import math
 import tkinter as tk
 
 from . import sky
-from .i18n import tr
+from .i18n import phrase, tr
 from .text import fit_text
 from .theme import (INK, INK_2, INK_3, WALL_UI_FAMILIES, pick_font,
                     round_rect)
@@ -176,7 +176,11 @@ class RecordingLayer:
                                       int(self.width * 0.46)))
 
     def set_log(self, rows):
-        """이벤트 로그를 적습니다. rows 는 (시각, 종류, 내용) 입니다."""
+        """이벤트 로그를 적습니다. rows 는 (시각, 종류, 내용) 입니다.
+
+        내용은 한국어 원문이나 ``(틀, 값, ...)`` 이며 적을 때마다 옮깁니다
+        (:func:`i18n.phrase`). 쓰는 말을 바꾼 뒤 다시 부르면 모든 줄이 바뀝니다.
+        """
         font = self.fonts["logrow"][0]
         room = int(self.width - (60 + BADGE_SIZE + 30) * self.scale
                    - 60 * self.scale_x)
@@ -189,6 +193,7 @@ class RecordingLayer:
             # 적을 때에만 쓰는 말로 옮깁니다.
             color = (LOG_START_INK if kind == "시작" else
                      LOG_STOP_INK if kind == "중단" else INK_3)
+            text = phrase(text)
             line = "%s   %s   %s" % (stamp, tr(kind), text) if kind else \
                    "%s   %s" % (stamp, text)
             self.canvas.itemconfigure(item, text=fit_text(line, font, room),

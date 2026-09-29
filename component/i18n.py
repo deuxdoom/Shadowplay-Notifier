@@ -50,6 +50,9 @@ EN = {
         "[Settings] Saved and restarted watching.",
     "[설정] 녹화가 끝나면 새 설정으로 감시를 다시 시작합니다.":
         "[Settings] Watching restarts with the new settings when recording ends.",
+    "감시를 시작했습니다": "Watching started",
+    "오류": "ERROR",
+    "초기 스캔 실패": "Initial scan failed",
     # ---------------------------------------------------------- 트레이
     "창 열기": "Open window",
     "윈도우 시작 시 실행": "Run at Windows start",
@@ -168,6 +171,11 @@ EN = {
     # ---------------------------------------------------------- 업데이트 오류
     "정식 버전 번호를 읽을 수 없습니다: %s": "Cannot read the version number: %s",
     "공개된 정식 릴리스가 아닙니다.": "That is not a published release.",
+    "이미 업데이트가 진행 중입니다.": "An update is already in progress.",
+    "기존 프로그램을 종료하지 못했습니다. 파일은 교체하지 않았습니다.":
+        "Could not close the running program. The file was not replaced.",
+    "새 프로그램이 시작 중 종료되었습니다.": "The new version quit while starting.",
+    "새 프로그램의 시작을 확인하지 못했습니다.": "Could not confirm that the new version started.",
     "최신 릴리스에 %s 파일이 아직 준비되지 않았습니다.":
         "The latest release does not have %s yet.",
     "공식 저장소의 다운로드 주소가 아닙니다.":
@@ -281,6 +289,9 @@ JA = {
         "[設定] 設定を保存して監視を再開しました。",
     "[설정] 녹화가 끝나면 새 설정으로 감시를 다시 시작합니다.":
         "[設定] 録画が終わったら新しい設定で監視を再開します。",
+    "감시를 시작했습니다": "監視を開始しました",
+    "오류": "エラー",
+    "초기 스캔 실패": "初回スキャンに失敗",
     # ---------------------------------------------------------- 트레이
     "창 열기": "ウィンドウを開く",
     "윈도우 시작 시 실행": "Windows 起動時に実行",
@@ -398,6 +409,11 @@ JA = {
     # ---------------------------------------------------------- 업데이트 오류
     "정식 버전 번호를 읽을 수 없습니다: %s": "バージョン番号を読み取れません: %s",
     "공개된 정식 릴리스가 아닙니다.": "公開された正式リリースではありません。",
+    "이미 업데이트가 진행 중입니다.": "すでにアップデートが進行中です。",
+    "기존 프로그램을 종료하지 못했습니다. 파일은 교체하지 않았습니다.":
+        "実行中のプログラムを終了できませんでした。ファイルは置き換えていません。",
+    "새 프로그램이 시작 중 종료되었습니다.": "新しいプログラムが起動中に終了しました。",
+    "새 프로그램의 시작을 확인하지 못했습니다.": "新しいプログラムの起動を確認できませんでした。",
     "최신 릴리스에 %s 파일이 아직 준비되지 않았습니다.":
         "最新のリリースにまだ %s がありません。",
     "공식 저장소의 다운로드 주소가 아닙니다.":
@@ -530,6 +546,21 @@ def tr(text):
     if _lang == DEFAULT:
         return text
     return TABLES.get(_lang, {}).get(text, text)
+
+
+def phrase(value):
+    """원문으로 들고 있던 글을 적는 순간의 말로 옮깁니다.
+
+    이벤트 로그처럼 화면에 오래 남는 글은 한국어 원문으로 담아 두었다가 적을
+    때마다 옮깁니다. 그래야 실행 중에 쓰는 말을 바꿔도 이미 올라간 줄까지
+    새 말로 바뀝니다. 문자열이면 통째로 옮기고, ``(틀, 값, ...)`` 이면 틀과
+    값을 따로 옮긴 뒤 채웁니다. 파일 경로처럼 사전에 없는 값은 그대로 나옵니다.
+    """
+    if isinstance(value, tuple):
+        template, *values = value
+        return tr(template) % tuple(tr(v) if isinstance(v, str) else v
+                                    for v in values)
+    return tr(value)
 
 
 def weekday_leads():
