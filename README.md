@@ -1,10 +1,12 @@
-# 🎬 ShadowPlay Notifier
+<h1 align="center">ShadowPlay Notifier</h1>
 
-[![RELEASE](https://img.shields.io/github/release/deuxdoom/Shadowplay-Notifier?style=flat&logo=github&logoColor=white&label=RELEASE&labelColor=2f353a&color=0ea5e9)](https://github.com/deuxdoom/Shadowplay-Notifier/releases/latest)
-[![Downloads Total](https://img.shields.io/github/downloads/deuxdoom/Shadowplay-Notifier/total?logo=github&style=flat&label=DOWNLOADS&labelColor=2f353a)](https://github.com/deuxdoom/Shadowplay-Notifier/releases)
-[![LICENSE](https://img.shields.io/badge/LICENSE-FREEWARE-22c55e?style=flat&labelColor=2f353a)](LICENSE)\
-[![Platform](https://img.shields.io/badge/PLATFORM-WINDOWS%2010%2F11-0078d4?style=flat&logo=windows&logoColor=white&labelColor=2f353a)](https://github.com/deuxdoom/Shadowplay-Notifier)
-[![NVIDIA](https://img.shields.io/badge/FOR-NVIDIA%20SHADOWPLAY-76b900?style=flat&logo=nvidia&logoColor=white&labelColor=2f353a)](https://www.nvidia.com/geforce/nvidia-app/)
+<p align="center">
+  <a href="https://github.com/deuxdoom/Shadowplay-Notifier/releases/latest"><img src="https://img.shields.io/github/release/deuxdoom/Shadowplay-Notifier?style=flat&logo=github&logoColor=white&label=RELEASE&labelColor=2f353a&color=0ea5e9" alt="RELEASE"></a>
+  <a href="https://github.com/deuxdoom/Shadowplay-Notifier/releases"><img src="https://img.shields.io/github/downloads/deuxdoom/Shadowplay-Notifier/total?logo=github&style=flat&label=DOWNLOADS&labelColor=2f353a" alt="Downloads Total"></a>
+  <a href="https://github.com/deuxdoom/Shadowplay-Notifier"><img src="https://img.shields.io/badge/PLATFORM-WINDOWS%2010%2F11-0078d4?style=flat&logo=windows&logoColor=white&labelColor=2f353a" alt="Platform"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/LICENSE-FREEWARE-22c55e?style=flat&labelColor=2f353a" alt="LICENSE"></a>
+  <a href="https://www.nvidia.com/geforce/nvidia-app/"><img src="https://img.shields.io/badge/FOR-NVIDIA%20SHADOWPLAY-76b900?style=flat&logo=nvidia&logoColor=white&labelColor=2f353a" alt="NVIDIA"></a>
+</p>
 
 <p align="center">
   <img src="assets/main.png" alt="녹화 중인 화면" width="100%">
@@ -22,6 +24,20 @@
 
 ---
 
+<p align="center">
+  <a href="#introduction">소개</a> &nbsp;·&nbsp;
+  <a href="#requirements">시스템 요구 사항</a> &nbsp;·&nbsp;
+  <a href="#features">주요 기능</a> &nbsp;·&nbsp;
+  <a href="#usage">다운로드 및 실행</a> &nbsp;·&nbsp;
+  <a href="#backup">설정 및 백업</a> &nbsp;·&nbsp;
+  <a href="#cautions">주의 사항</a> &nbsp;·&nbsp;
+  <a href="#license">라이선스 및 저작권</a>
+</p>
+
+<a id="introduction"></a>
+
+<a id="-소개"></a>
+
 ## 📌 소개
 
 NVIDIA App 의 녹화 상태 아이콘이 영상에 그대로 찍히는 것이 싫어서 표시를 꺼 두면,
@@ -38,6 +54,17 @@ NVIDIA App 의 녹화 상태 아이콘이 영상에 그대로 찍히는 것이 �
 설치 과정이 없고 Python 도 필요하지 않습니다. 실행 파일 하나로 씁니다.
 
 ---
+
+<a id="requirements"></a>
+
+## 💻 시스템 요구 사항
+
+- Windows 10 이상
+- 실행 파일 옆에 설정과 로그를 저장할 수 있는 폴더
+
+<a id="features"></a>
+
+<a id="-주요-기능"></a>
 
 ## ✨ 주요 기능
 
@@ -94,7 +121,11 @@ NVIDIA App 의 녹화 상태 아이콘이 영상에 그대로 찍히는 것이 �
 
 ---
 
-## 📦 설치 및 실행
+<a id="usage"></a>
+
+<a id="-설치-및-실행"></a>
+
+## 🚀 다운로드 및 실행
 
 1. [Releases](https://github.com/deuxdoom/Shadowplay-Notifier/releases/latest)에서
    `ShadowPlayNotifier.exe` 를 내려받아 원하는 폴더에 둡니다.
@@ -119,7 +150,69 @@ EXE를 교체해 다시 실행합니다. 터미널 창은 뜨지 않으며 설�
 
 ---
 
-## 🛡️ 백신이 막을 때
+---
+
+<a id="controls"></a>
+
+<a id="-기본-조작"></a>
+
+### 기본 조작
+
+| 동작 | 방법 |
+| --- | --- |
+| 창 이동 | 창의 아무 곳이나 마우스로 끌기 |
+| 전체화면 | 오른쪽 위 전체화면 버튼 또는 `F11` |
+| 전체화면 해제 | 전체화면에서 `Esc` |
+| 트레이로 이동 | 오른쪽 위 `✕` 버튼 또는 일반 창에서 `Esc` |
+| 24시간 ↔ 12시간 | 월페이퍼의 시계를 클릭 |
+| 창 복원 | 트레이 아이콘 클릭 |
+| 최신 버전 확인·업데이트 | 트레이 우클릭 → 최신 버전 확인 |
+| 프로그램 종료 | 트레이 우클릭 → 프로그램 종료, 또는 `Ctrl+Q` |
+
+키보드 단축키는 창을 한 번 클릭한 뒤에 씁니다. 타이틀바가 없는 창이라 초점을 자동으로
+받지 못하기 때문입니다. 오른쪽 위의 환경설정·전체화면·닫기 버튼은 마우스를 창 위로
+옮기거나 창이 앞으로 나왔을 때 나타나고, 잠시 뒤 다시 숨습니다.
+
+---
+
+<a id="backup"></a>
+
+<a id="-설정"></a>
+
+## 💾 설정 및 백업
+
+환경설정 창에서 바꾼 값은 실행 파일 옆의 `config.json` 에 저장되고 곧바로 적용됩니다.
+앱을 껐다 켤 필요가 없습니다.
+
+| 항목 | 설명 |
+| --- | --- |
+| 녹화 폴더 | 녹화 중에 파일이 커지는 폴더입니다. 하위 폴더까지 함께 봅니다. |
+| 폴링 주기 | 폴더를 훑어보는 간격입니다. 기본 0.5초입니다. |
+| 중단 판정 시간 | 파일이 커지지 않은 채 이만큼 지나면 녹화가 끝난 것으로 봅니다. |
+| 표시할 모니터 | `-1` 이면 창 크기와 같은 해상도의 모니터를 자동으로 고릅니다. |
+| 날씨를 볼 도시 | 도시 이름으로 고릅니다. `Seo` 까지만 적어도 `Seoul` 이 후보로 나옵니다. |
+| 화면에 쓰는 말 | 한국어·영어·일본어 가운데 고릅니다. 기본값은 한국어입니다. |
+| 항상 위 · 소리 | 게임 녹화에 소리가 섞이면 안 되므로 알림음은 기본 꺼짐입니다. |
+| `verbose_log` | 자세한 기록을 남길지 정합니다. 문제를 찾을 때만 `true` 로 켜십시오. |
+
+도시는 한글(`서울`)로도 찾을 수 있고, `Segu` 처럼 적어도 `Séguéla` 같은 이름이
+나옵니다. 목록에 없는 곳은 인터넷에서 찾아 후보에 덧붙입니다. 고른 도시의 좌표는
+`config.json` 의 `city` · `latitude` · `longitude` 에 함께 저장됩니다.
+
+날씨는 [Open-Meteo](https://open-meteo.com/) 에서 받아 오며 API 키가 필요 없습니다.
+네트워크가 없거나 조회에 실패해도 시계와 음악은 그대로 나옵니다.
+
+녹화 기록과 오류는 `monitor.log` 에 남습니다. 녹화가 감지되지 않으면 먼저 녹화 폴더
+경로부터 확인하십시오. 기록이 1MB 를 넘으면 `monitor.log.1` 로 옮기고 새로 쓰며,
+바로 전 파일 하나만 남깁니다.
+
+---
+
+<a id="cautions"></a>
+
+<a id="-백신이-막을-때"></a>
+
+## ⚠️ 주의 사항
 
 카스퍼스키를 비롯한 백신이 이 앱을 위험하다고 알리거나, 내려받은 실행 파일을 말없이
 격리하거나 지우는 일이 있습니다. 만드는 과정에서도 `.py` 와 `.exe` 파일이 여러 번
@@ -153,65 +246,32 @@ EXE를 교체해 다시 실행합니다. 터미널 창은 뜨지 않으며 설�
 윈도우 보안은 `바이러스 및 위협 방지 → 설정 관리 → 제외 추가 또는 제거` 에서 넣고,
 카스퍼스키는 설정의 제외 항목 관리에서 넣습니다.
 
----
+<a id="support"></a>
 
-## 🖱️ 기본 조작
+## 🤝 문의 및 지원
 
-| 동작 | 방법 |
+- **버그 제보 및 기능 제안:** [GitHub Issues](https://github.com/deuxdoom/Shadowplay-Notifier/issues)
+- **버전별 변경 내용:** [변경 기록](CHANGELOG.md) · [전체 릴리스](https://github.com/deuxdoom/Shadowplay-Notifier/releases)
+
+<a id="license"></a>
+
+<a id="-라이선스"></a>
+
+## 📜 라이선스 및 저작권
+
+**Copyright © 2026 deuxdoom. All rights reserved.**
+
+| 항목 | 내용 |
 | --- | --- |
-| 창 이동 | 창의 아무 곳이나 마우스로 끌기 |
-| 전체화면 | 오른쪽 위 전체화면 버튼 또는 `F11` |
-| 전체화면 해제 | 전체화면에서 `Esc` |
-| 트레이로 이동 | 오른쪽 위 `✕` 버튼 또는 일반 창에서 `Esc` |
-| 24시간 ↔ 12시간 | 월페이퍼의 시계를 클릭 |
-| 창 복원 | 트레이 아이콘 클릭 |
-| 최신 버전 확인·업데이트 | 트레이 우클릭 → 최신 버전 확인 |
-| 프로그램 종료 | 트레이 우클릭 → 프로그램 종료, 또는 `Ctrl+Q` |
-
-키보드 단축키는 창을 한 번 클릭한 뒤에 씁니다. 타이틀바가 없는 창이라 초점을 자동으로
-받지 못하기 때문입니다. 오른쪽 위의 환경설정·전체화면·닫기 버튼은 마우스를 창 위로
-옮기거나 창이 앞으로 나왔을 때 나타나고, 잠시 뒤 다시 숨습니다.
-
----
-
-## ⚙️ 설정
-
-환경설정 창에서 바꾼 값은 실행 파일 옆의 `config.json` 에 저장되고 곧바로 적용됩니다.
-앱을 껐다 켤 필요가 없습니다.
-
-| 항목 | 설명 |
-| --- | --- |
-| 녹화 폴더 | 녹화 중에 파일이 커지는 폴더입니다. 하위 폴더까지 함께 봅니다. |
-| 폴링 주기 | 폴더를 훑어보는 간격입니다. 기본 0.5초입니다. |
-| 중단 판정 시간 | 파일이 커지지 않은 채 이만큼 지나면 녹화가 끝난 것으로 봅니다. |
-| 표시할 모니터 | `-1` 이면 창 크기와 같은 해상도의 모니터를 자동으로 고릅니다. |
-| 날씨를 볼 도시 | 도시 이름으로 고릅니다. `Seo` 까지만 적어도 `Seoul` 이 후보로 나옵니다. |
-| 화면에 쓰는 말 | 한국어·영어·일본어 가운데 고릅니다. 기본값은 한국어입니다. |
-| 항상 위 · 소리 | 게임 녹화에 소리가 섞이면 안 되므로 알림음은 기본 꺼짐입니다. |
-| `verbose_log` | 자세한 기록을 남길지 정합니다. 문제를 찾을 때만 `true` 로 켜십시오. |
-
-도시는 한글(`서울`)로도 찾을 수 있고, `Segu` 처럼 적어도 `Séguéla` 같은 이름이
-나옵니다. 목록에 없는 곳은 인터넷에서 찾아 후보에 덧붙입니다. 고른 도시의 좌표는
-`config.json` 의 `city` · `latitude` · `longitude` 에 함께 저장됩니다.
-
-날씨는 [Open-Meteo](https://open-meteo.com/) 에서 받아 오며 API 키가 필요 없습니다.
-네트워크가 없거나 조회에 실패해도 시계와 음악은 그대로 나옵니다.
-
-녹화 기록과 오류는 `monitor.log` 에 남습니다. 녹화가 감지되지 않으면 먼저 녹화 폴더
-경로부터 확인하십시오. 기록이 1MB 를 넘으면 `monitor.log.1` 로 옮기고 새로 쓰며,
-바로 전 파일 하나만 남깁니다.
-
----
-
-## 📜 라이선스
-
-ShadowPlay Notifier 는 **무료로 쓰는 프리웨어**이며 소스 코드는 공개하지 않습니다.
-Copyright (c) 2026 deuxdoom. All rights reserved.
+| 배포 형태 | 프리웨어 (개인·업무 용도 무료) |
+| 소스 코드 | 비공개 |
 
 - 공식 배포처에서 받은 실행 파일은 개인이든 업무든 용도에 관계없이 무료로 쓸 수 있습니다.
 - 허락 없이 고치거나 역설계할 수 없고, 실행 파일을 다른 곳에 올리거나 판매하는 등 상업적으로 배포하는 것은 금지합니다.
   공식 배포처의 링크를 알리는 것은 자유입니다.
 - 자세한 조건은 [LICENSE](LICENSE)에 있습니다.
+
+### 제3자 구성 요소
 
 함께 담은 아이콘(GitHub Octicons, Microsoft Fluent UI System Icons)과 글꼴(Pretendard,
 JetBrains Mono), 사계절 사진(Unsplash)은 각자의 라이선스를 따릅니다. 출처와 원문은
