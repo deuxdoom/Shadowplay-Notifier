@@ -366,7 +366,7 @@ footer .links { display: flex; gap: 18px; flex: none; }
     <div class="hero-tags">
       <p class="status"><span class="dot"></span><span class="mono">Watching · Idle</span></p>
       <a class="relpill" href="https://github.com/deuxdoom/Shadowplay-Notifier/releases/latest">
-        <span class="mono">Release</span><b data-ver>2.7.1</b>
+        <span class="mono">Release</span><b data-ver>2.7.2</b>
         <svg class="icon" aria-hidden="true"><use href="#i-chevron"/></svg>
       </a>
     </div>
@@ -452,7 +452,7 @@ footer .links { display: flex; gap: 18px; flex: none; }
       <article class="cell">
         <div class="cell-top"><svg class="icon"><use href="#i-clock"/></svg><span class="no">04</span></div>
         <h3>시계와 날씨</h3>
-        <p>Pretendard로 맞춘 큰 시계와 날짜, 요일에 더해 기온과 오늘 달, 날씨 정보를 띄웁니다. 시계를 누르면 24시간과 12시간 표시를 오가고, 12시간 표시에서는 시의 앞자리 0을 빼고 AM 은 연두, PM 은 라일락으로 구분합니다. 토요일과 일요일도 색으로 구분합니다. 콜론만 매초 깜빡이고 초 숫자는 계속 표시됩니다. 날씨는 Open-Meteo 에서 받으며 API 키가 필요 없고, 볼 곳은 도시 이름으로 고릅니다.</p>
+        <p>Pretendard JP로 맞춘 큰 시계와 날짜, 요일에 더해 기온과 오늘 달, 날씨 정보를 띄웁니다. 시계를 누르면 24시간과 12시간 표시를 오갑니다. 시·분·초의 숫자 간격과 자리를 고정해 전환하거나 시각이 바뀌어도 위치가 흔들리지 않으며, 12시간에서는 앞자리 0만 비웁니다. AM 은 연두, PM 은 라일락이고 토요일과 일요일도 색으로 구분합니다. 콜론만 매초 깜빡이고 초 숫자는 계속 표시됩니다. 날씨는 Open-Meteo 에서 받으며 API 키가 필요 없고, 볼 곳은 도시 이름으로 고릅니다.</p>
       </article>
       <article class="cell">
         <div class="cell-top"><svg class="icon"><use href="#i-music"/></svg><span class="no">05</span></div>
@@ -462,7 +462,7 @@ footer .links { display: flex; gap: 18px; flex: none; }
       <article class="cell">
         <div class="cell-top"><svg class="icon"><use href="#i-wave"/></svg><span class="no">06</span></div>
         <h3>소리에 맞춰 움직이는 파형</h3>
-        <p>스피커로 나가는 소리를 12개 대역으로 나누어 64개의 무지개색 막대로 그립니다. 소리는 세기만 재고 녹음하거나 저장하지 않으며, 기본 출력 장치를 바꾸거나 헤드셋을 끊어도 새 장치를 따라갑니다.</p>
+        <p>스피커로 나가는 소리를 24개 대역으로 나누어 24개의 무지개색 막대로 그립니다. 각 막대는 해당 대역의 실제 세기를 따라 움직입니다. 소리는 녹음하거나 저장하지 않으며, 기본 출력 장치를 바꾸거나 헤드셋을 끊어도 새 장치를 따라갑니다.</p>
       </article>
       <article class="cell">
         <div class="cell-top"><svg class="icon"><use href="#i-season"/></svg><span class="no">07</span></div>
@@ -487,7 +487,7 @@ footer .links { display: flex; gap: 18px; flex: none; }
       <article class="cell">
         <div class="cell-top"><svg class="icon"><use href="#i-sync"/></svg><span class="no">11</span></div>
         <h3>앱에서 업데이트</h3>
-        <p>트레이의 ‘최신 버전 확인’으로 새 정식 버전을 받아 그 자리에서 설치하고 다시 실행합니다. 진행 창도 선택한 언어로 표시합니다. 받은 파일의 SHA-256 을 맞춰 보며, 실패하면 쓰던 버전을 되돌립니다.</p>
+        <p>시작 시 새 정식 버전을 자동으로 확인하고, 새 버전이 있을 때만 안내합니다. 트레이의 ‘최신 버전 확인’으로 직접 확인할 수도 있습니다. 업데이트하면 같은 폴더에 설치한 뒤 다시 실행하며, 진행 창도 선택한 언어로 표시합니다. 받은 파일의 SHA-256 을 맞춰 보며, 실패하면 쓰던 버전을 되돌립니다.</p>
       </article>
       <article class="cell">
         <div class="cell-top"><svg class="icon"><use href="#i-bolt"/></svg><span class="no">12</span></div>
@@ -584,7 +584,7 @@ footer .links { display: flex; gap: 18px; flex: none; }
     <span>ShadowPlay Notifier</span>
     <span>Windows 10 · 11</span>
     <span>Freeware</span>
-    <span class="last" id="ver">2.7.1</span>
+    <span class="last" id="ver">2.7.2</span>
   </div>
   <footer>
     <div class="rows">
