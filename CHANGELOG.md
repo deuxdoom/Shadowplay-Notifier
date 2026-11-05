@@ -3,6 +3,18 @@
 이 파일의 형식은 [Keep a Changelog 1.1.0](https://keepachangelog.com/ko/1.1.0/)을
 따르며, 버전은 [유의적 버전 2.0.0](https://semver.org/lang/ko/)을 따릅니다.
 
+## [2.7.3] - 2026-11-05
+
+### 수정
+
+- 실행 환경의 시간대 설정 때문에 월페이퍼 시계가 Windows 시각과 다르게 표시되던
+  문제를 고쳤습니다. 시계·날짜·배경 시간대와 녹화 이벤트·로그의 시각을 Windows의
+  현재 현지 시각에 맞추며, 실행 중 시스템 시각이나 시간대가 바뀌어도 따라갑니다.
+
+[2.7.3]: https://github.com/deuxdoom/Shadowplay-Notifier/releases/tag/2.7.3
+
+---
+
 ## [2.7.2] - 2026-10-28
 
 ### 수정
