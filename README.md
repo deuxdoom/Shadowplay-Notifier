@@ -272,13 +272,14 @@ EXE를 교체해 다시 실행합니다. 터미널 창은 뜨지 않으며 설�
 | 배포 형태 | 프리웨어 (개인·업무 용도 무료) |
 | 소스 코드 | 비공개 |
 
-- 공식 배포처에서 받은 실행 파일은 개인이든 업무든 용도에 관계없이 무료로 쓸 수 있습니다.
-- 허락 없이 고치거나 역설계할 수 없고, 실행 파일을 다른 곳에 올리거나 판매하는 등 상업적으로 배포하는 것은 금지합니다.
-  공식 배포처의 링크를 알리는 것은 자유입니다.
-- 자세한 조건은 [LICENSE](LICENSE)에 있습니다.
+- **허용:** 공식 배포처에서 받은 실행 파일을 개인·업무 용도에 관계없이 무료로 설치하고 사용할 수 있습니다. 공식 배포처 링크는 자유롭게 공유할 수 있습니다.
+- **금지:** 저작권자의 사전 서면 허락 없이 수정하거나 2차적 저작물을 만들 수 없고, 법률이 허용하는 범위를 제외하고 역설계할 수 없으며, 공식 배포처가 아닌 곳에 다시 올리거나 판매·대여할 수 없습니다.
+- **전문:** [LICENSE](LICENSE)
 
 ### 제3자 구성 요소
 
-함께 담은 아이콘(GitHub Octicons, Microsoft Fluent UI System Icons)과 글꼴(Pretendard JP,
-JetBrains Mono), 사계절 사진(Unsplash)은 각자의 라이선스를 따릅니다. 출처와 원문은
-[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)에 모아 두었습니다.
+함께 배포하는 제3자 구성 요소는 각자의 라이선스를 따르며, 위 조건은 그 라이선스가 부여하는 권리를 제한하지 않습니다. 아이콘(GitHub Octicons, Microsoft Fluent UI System Icons), 글꼴(Pretendard JP, JetBrains Mono), 사계절 사진(Unsplash)의 출처와 원문은 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)에 모아 두었습니다.
+
+### 상표
+
+NVIDIA, ShadowPlay, Spotify는 각 소유자의 상표입니다. ShadowPlay Notifier는 독립적으로 만든 비공식 프로그램이며, 해당 기업과 제휴하거나 승인을 받지 않았습니다.
