@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ShadowPlay Notifier — 녹화 감지와 다용도 월페이퍼</title>
-<meta name="description" content="NVIDIA ShadowPlay 의 녹화를 자동으로 감지해 보조 모니터에 크게 알려 주고, 녹화가 없는 동안에는 시계와 날씨, 음악, 사계절 사진을 띄우는 윈도우용 월페이퍼 앱입니다.">
+<meta name="description" content="NVIDIA ShadowPlay, AVerMedia Streaming Center, Veyra 의 녹화를 자동으로 감지해 보조 모니터에 크게 알려 주고, 녹화가 없는 동안에는 시계와 날씨, 음악, 사계절 사진을 띄우는 윈도우용 월페이퍼 앱입니다.">
 <link rel="canonical" href="https://deuxdoom.github.io/Shadowplay-Notifier/">
 <meta name="theme-color" content="#06090c">
 
@@ -366,7 +366,7 @@ footer .links { display: flex; gap: 18px; flex: none; }
     <div class="hero-tags">
       <p class="status"><span class="dot"></span><span class="mono">Watching · Idle</span></p>
       <a class="relpill" href="https://github.com/deuxdoom/Shadowplay-Notifier/releases/latest">
-        <span class="mono">Release</span><b data-ver>2.7.3</b>
+        <span class="mono">Release</span><b data-ver>2.7.4</b>
         <svg class="icon" aria-hidden="true"><use href="#i-chevron"/></svg>
       </a>
     </div>
@@ -390,8 +390,8 @@ footer .links { display: flex; gap: 18px; flex: none; }
         <dl class="specs">
           <div><dt>Platform</dt><dd>Windows 10 · 11</dd></div>
           <div><dt>Install</dt><dd>실행 파일 하나를 받아 그대로 실행합니다. Python 을 설치하지 않습니다.</dd></div>
-          <div><dt>Capture</dt><dd>폴더를 읽기만 하므로 녹화 프로그램을 가리지 않습니다.</dd></div>
-          <div><dt>License</dt><dd>Freeware · 무료로 씁니다.</dd></div>
+          <div><dt>Capture</dt><dd>ShadowPlay, AVerMedia Streaming Center, Veyra 의 녹화 폴더를 읽기만 합니다.</dd></div>
+          <div><dt>License</dt><dd>MIT · 소스를 공개합니다.</dd></div>
         </dl>
       </div>
       <figure class="hero-shot frame idle">
@@ -419,7 +419,7 @@ footer .links { display: flex; gap: 18px; flex: none; }
       <li>
         <span class="k">03 — STAY OUT</span>
         <h3>녹화에 끼어들지 않습니다</h3>
-        <p>폴더를 읽기만 하고 결과물에는 손대지 않습니다. 어떤 녹화 도구를 쓰든 동작하며, 창을 닫으면 트레이에서 감시만 이어 갑니다.</p>
+        <p>폴더를 읽기만 하고 결과물에는 손대지 않습니다. 녹화 프로그램에 끼어들지 않으며, 창을 닫으면 트레이에서 감시만 이어 갑니다.</p>
       </li>
     </ul>
   </div>
@@ -446,8 +446,8 @@ footer .links { display: flex; gap: 18px; flex: none; }
       </article>
       <article class="cell">
         <div class="cell-top"><svg class="icon"><use href="#i-shield"/></svg><span class="no">03</span></div>
-        <h3>읽기만 하는 감시</h3>
-        <p>녹화 프로그램에 끼어들지 않고 폴더를 읽기만 합니다. 녹화 결과물을 지우거나 옮기는 기능은 넣지 않았습니다.</p>
+        <h3>세 가지 녹화 프로그램</h3>
+        <p>ShadowPlay, AVerMedia Streaming Center, Veyra 의 녹화 폴더를 따로 지정해 함께 지켜봅니다. 녹화 화면에는 ShadowPlay 는 게임 폴더 이름을, 나머지는 프로그램 이름을 적습니다. 폴더를 읽기만 하며 결과물을 지우거나 옮기는 기능은 넣지 않았습니다.</p>
       </article>
       <article class="cell">
         <div class="cell-top"><svg class="icon"><use href="#i-clock"/></svg><span class="no">04</span></div>
@@ -549,7 +549,7 @@ footer .links { display: flex; gap: 18px; flex: none; }
       <div class="setup-row">
         <span class="no">RUN 03</span>
         <h3>녹화 폴더 알려 주기</h3>
-        <p>오른쪽 위 환경설정에서 NVIDIA App 의 동영상 저장 폴더를 고르고 저장하면 그때부터 하위 폴더까지 지켜봅니다.</p>
+        <p>오른쪽 위 환경설정에서 쓰는 녹화 프로그램(ShadowPlay, AVerMedia Streaming Center, Veyra)의 저장 폴더를 고르고 저장하면 그때부터 하위 폴더까지 지켜봅니다. 쓰지 않는 프로그램은 비워 둡니다.</p>
       </div>
     </div>
     <p class="note">
@@ -564,7 +564,7 @@ footer .links { display: flex; gap: 18px; flex: none; }
   <div class="shell inner">
     <div>
       <h2>보조 모니터를 비워 두지 마십시오</h2>
-      <p>녹화할 때는 녹화 상태를, 그렇지 않을 때는 시계와 날씨와 음악을 띄웁니다. 무료이며 공식 배포처에서만 내려받을 수 있습니다.</p>
+      <p>녹화할 때는 녹화 상태를, 그렇지 않을 때는 시계와 날씨와 음악을 띄웁니다. 무료 오픈소스(MIT)이며, 실행 파일은 공식 배포처에서 내려받으십시오.</p>
     </div>
     <div class="cta">
       <a class="btn btn-main" data-exe href="https://github.com/deuxdoom/Shadowplay-Notifier/releases/latest/download/ShadowPlayNotifier.exe">
@@ -583,18 +583,18 @@ footer .links { display: flex; gap: 18px; flex: none; }
   <div class="statusbar">
     <span>ShadowPlay Notifier</span>
     <span>Windows 10 · 11</span>
-    <span>Freeware</span>
-    <span class="last" id="ver">2.7.3</span>
+    <span>MIT License</span>
+    <span class="last" id="ver">2.7.4</span>
   </div>
   <footer>
     <div class="rows">
       <p class="credits">
-        © 2026 deuxdoom. All rights reserved. 무료로 쓰되 허락 없이 고치거나 다시 배포할 수 없습니다(<a href="https://github.com/deuxdoom/Shadowplay-Notifier/blob/main/LICENSE">LICENSE</a>).<br>
+        © 2026 deuxdoom. 소스는 MIT 라이선스로 공개합니다(<a href="https://github.com/deuxdoom/Shadowplay-Notifier/blob/main/LICENSE">LICENSE</a>).<br>
         아이콘은 Microsoft <a href="https://github.com/microsoft/fluentui-system-icons">Fluent UI System Icons</a>,
         계절 사진은 <a href="https://unsplash.com/">Unsplash</a>,
         글꼴은 <a href="https://github.com/orioncactus/pretendard">Pretendard</a> 와
         <a href="https://github.com/JetBrains/JetBrainsMono">JetBrains Mono</a> 를 썼습니다.<br>
-        NVIDIA, ShadowPlay 는 NVIDIA Corporation 의 상표이며 이 프로젝트와 관련이 없습니다.
+        NVIDIA, ShadowPlay 는 NVIDIA Corporation, AVerMedia 는 AVerMedia Technologies 의 상표이며 이 프로젝트와 관련이 없습니다.
       </p>
       <p class="links">
         <a href="https://github.com/deuxdoom/Shadowplay-Notifier">GitHub</a>

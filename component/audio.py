@@ -1,0 +1,490 @@
+"""스피커로 나가는 소리를 받아 주파수 막대로 바꾸는 일입니다.
+
+윈도우의 WASAPI 루프백을 ``ctypes`` 로 직접 열어 출력 샘플을 읽고, 순수
+파이썬 FFT 로 24대역 세기를 구합니다. 외부 패키지를 쓰지 않습니다.
+
+소리를 녹음하는 것이 아니라 세기만 재며, 어디에도 저장하지 않습니다.
+녹화가 시작되면 :meth:`AudioLevels.stop` 으로 장치를 닫습니다.
+
+장치가 끊기거나 윈도우의 기본 출력 장치가 바뀌면 닫았다가 새 기본 장치로
+다시 엽니다. 루프백은 연 장치에 묶여 있어서, 기본 장치만 바꾸면 예외 없이
+예전 장치를 계속 캡처하기 때문입니다.
+
+대역마다 최근 천장과 바닥을 따라가며 그 사이를 0~1 로 펼칩니다. 고정 범위로
+자르면 음악의 저역이 늘 꼭대기에 붙어서 막대가 움직이지 않습니다.
+"""
+
+import cmath
+import ctypes
+import math
+import struct
+import threading
+import time
+from ctypes import POINTER, byref, c_uint, c_uint32, c_uint64, c_void_p
+
+from .paths import detail, log
+
+BARS = 24
+N_FFT = 1024
+LOW_HZ, HIGH_HZ = 40.0, 16000.0
+# 음악은 저역 에너지가 크므로 옥타브마다 이만큼 올려 준다
+TILT_DB = 4.0
+# 대역이 쓰는 구간이 이보다 좁아지면 더 좁히지 않는다
+MIN_SPAN_DB = 14.0
+# 장치를 다시 여는 간격입니다. 실패가 이어지면 두 배씩 늘립니다.
+REOPEN_MIN_SEC, REOPEN_MAX_SEC = 1.0, 10.0
+# 기본 출력 장치가 바뀌었는지 이 간격으로 확인합니다.
+DEVICE_CHECK_SEC = 2.0
+
+ole32 = ctypes.windll.ole32
+
+CLSID_MMDeviceEnumerator = "{BCDE0395-E52F-467C-8E3D-C4579291692E}"
+IID_IMMDeviceEnumerator = "{A95664D2-9614-4F35-A746-DE8DB63617E6}"
+IID_IAudioClient = "{1CB9AD4C-DBFA-4c32-B178-C2F568A703B2}"
+IID_IAudioCaptureClient = "{C8ADBD64-E71E-48a0-A4DE-185C395CD317}"
+
+CLSCTX_ALL = 23
+AUDCLNT_SHAREMODE_SHARED = 0
+AUDCLNT_STREAMFLAGS_LOOPBACK = 0x00020000
+AUDCLNT_BUFFERFLAGS_SILENT = 0x2
+BUFFER_100NS = 2000000  # 0.2 초
+WAVE_FORMAT_PCM = 0x0001
+WAVE_FORMAT_IEEE_FLOAT = 0x0003
+WAVE_FORMAT_EXTENSIBLE = 0xFFFE
+
+
+class GUID(ctypes.Structure):
+    _fields_ = [("Data1", ctypes.c_uint32), ("Data2", ctypes.c_uint16),
+                ("Data3", ctypes.c_uint16), ("Data4", ctypes.c_ubyte * 8)]
+
+    def __init__(self, text=None):
+        super().__init__()
+        if text:
+            ole32.CLSIDFromString(ctypes.c_wchar_p(text), byref(self))
+
+
+class WAVEFORMATEX(ctypes.Structure):
+    _pack_ = 1
+    _fields_ = [("wFormatTag", ctypes.c_uint16), ("nChannels", ctypes.c_uint16),
+                ("nSamplesPerSec", ctypes.c_uint32),
+                ("nAvgBytesPerSec", ctypes.c_uint32),
+                ("nBlockAlign", ctypes.c_uint16), ("wBitsPerSample", ctypes.c_uint16),
+                ("cbSize", ctypes.c_uint16)]
+
+
+class WAVEFORMATEXTENSIBLE(ctypes.Structure):
+    _pack_ = 1
+    _fields_ = [("Format", WAVEFORMATEX), ("Samples", ctypes.c_uint16),
+                ("dwChannelMask", ctypes.c_uint32), ("SubFormat", GUID)]
+
+
+ole32.CoTaskMemFree.argtypes = [c_void_p]
+ole32.CoTaskMemFree.restype = None
+ole32.CoUninitialize.argtypes = []
+ole32.CoUninitialize.restype = None
+
+
+def _vcall(ptr, index, argtypes, *args):
+    """COM 객체의 vtable 에서 index 번째 메서드를 부릅니다."""
+    vtable = ctypes.cast(ptr, POINTER(POINTER(c_void_p))).contents
+    proto = ctypes.WINFUNCTYPE(ctypes.HRESULT, c_void_p, *argtypes)
+    return proto(vtable[index])(ptr, *args)
+
+
+def _release(ptr):
+    if ptr:
+        _vcall(ptr, 2, [])  # IUnknown::Release
+
+
+def _device_id(device):
+    """IMMDevice 의 장치 ID 를 읽습니다."""
+    text = c_void_p()
+    _vcall(device, 5, [POINTER(c_void_p)], byref(text))  # IMMDevice::GetId
+    try:
+        return ctypes.wstring_at(text.value) if text.value else ""
+    finally:
+        ole32.CoTaskMemFree(text)
+
+
+def _sample_kind(fmt_ptr):
+    """공유 모드 장치 형식을 실제로 해석할 수 있을 때만 돌려줍니다."""
+    fmt = fmt_ptr.contents
+    tag = fmt.wFormatTag
+    if tag == WAVE_FORMAT_EXTENSIBLE:
+        if fmt.cbSize < 22:
+            raise OSError("잘못된 WAVEFORMATEXTENSIBLE 형식입니다")
+        tag = ctypes.cast(fmt_ptr, POINTER(WAVEFORMATEXTENSIBLE)).contents.SubFormat.Data1
+    if tag == WAVE_FORMAT_IEEE_FLOAT and fmt.wBitsPerSample == 32:
+        return "float32"
+    if tag == WAVE_FORMAT_PCM and fmt.wBitsPerSample == 16:
+        return "pcm16"
+    raise OSError("지원하지 않는 오디오 형식입니다 (tag=%d, %d bit)"
+                  % (tag, fmt.wBitsPerSample))
+
+
+# FFT 에 쓰는 회전 인자와 창 함수는 한 번만 만들어 둡니다.
+_TWIDDLE = [cmath.exp(-2j * math.pi * k / N_FFT) for k in range(N_FFT)]
+_WINDOW = [0.5 - 0.5 * math.cos(2 * math.pi * i / (N_FFT - 1)) for i in range(N_FFT)]
+
+
+def fft(values):
+    """반복형 radix-2 FFT 입니다.
+
+    길이는 :data:`N_FFT` 이하의 2의 거듭제곱이어야 합니다. 회전 인자는
+    :data:`N_FFT` 짜리 표 하나를 간격만 바꿔 같이 씁니다.
+    """
+    n = len(values)
+    out = list(values)
+    j = 0
+    for i in range(1, n):
+        bit = n >> 1
+        while j & bit:
+            j ^= bit
+            bit >>= 1
+        j |= bit
+        if i < j:
+            out[i], out[j] = out[j], out[i]
+    size = 2
+    while size <= n:
+        step, half = N_FFT // size, size // 2
+        for start in range(0, n, size):
+            k = 0
+            for i in range(start, start + half):
+                w = _TWIDDLE[k]
+                a = out[i]
+                b = out[i + half] * w
+                out[i] = a + b
+                out[i + half] = a - b
+                k += step
+        size <<= 1
+    return out
+
+
+def power_spectrum(values, low, high):
+    """실수 신호의 FFT 세기 ``|X[k]|²`` 를 ``low <= k < high`` 칸만 구합니다.
+
+    실수 N 개를 짝수·홀수 번째끼리 묶어 복소수 N/2 개로 만들면, 절반 길이의
+    FFT 한 번과 칸마다 몇 번의 곱셈으로 같은 스펙트럼이 나옵니다. 1024칸
+    FFT 를 그대로 돌리던 때보다 약 40% 빠르고, 결과의 차이는 부동소수점
+    반올림(상대 오차 1e-13 아래)뿐입니다. 나머지 칸은 0 으로 둡니다.
+    """
+    n = len(values)
+    half = n // 2
+    z = fft([complex(values[i], values[i + 1]) for i in range(0, n, 2)])
+    stride = N_FFT // n
+    out = [0.0] * (half + 1)
+    for k in range(max(0, low), min(half + 1, high)):
+        a = z[k % half]
+        b = z[(half - k) % half].conjugate()
+        x = (a + b) * .5 - .5j * _TWIDDLE[k * stride] * (a - b)
+        out[k] = x.real * x.real + x.imag * x.imag
+    return out
+
+
+def band_edges(rate):
+    """주파수를 24대역으로 나누되 각 FFT 칸은 한 대역에만 넣습니다."""
+    bin_hz = rate / N_FFT
+    high_hz = min(HIGH_HZ, rate / 2)
+    hz = [LOW_HZ * (high_hz / LOW_HZ) ** (i / BARS) for i in range(BARS + 1)]
+    limit = min(N_FFT // 2, round(high_hz / bin_hz))
+    edges = [max(1, min(round(hz[0] / bin_hz), limit - BARS))]
+    for i in range(1, BARS + 1):
+        # 저역은 FFT 해상도보다 촘촘히 나눌 수 없습니다. 중복 대역을
+        # 만드는 대신 최소 한 칸을 배정하고, 뒤 대역이 쓸 칸도 남깁니다.
+        edges.append(max(edges[-1] + 1,
+                         min(round(hz[i] / bin_hz), limit - (BARS - i))))
+    hz = [edge * bin_hz for edge in edges]
+    centers = [math.sqrt(hz[i] * hz[i + 1]) for i in range(BARS)]
+    return hz, edges, centers
+
+
+class AudioLevels(threading.Thread):
+    """출력 소리를 받아 24대역 세기를 계속 갱신하는 스레드입니다.
+
+    화면 쪽에서는 :attr:`levels` 를 그대로 읽어 씁니다. 값은 0~1 입니다.
+    장치를 열지 못하면 조용히 물러나고 :attr:`available` 이 False 가 됩니다.
+    """
+
+    def __init__(self, fps=30):
+        super().__init__(name="audio-levels", daemon=True)
+        self.fps = max(10, min(60, int(fps)))
+        self.levels = [0.0] * BARS
+        self.silent = True
+        self.available = False
+        self.error = ""
+        self.stop_event = threading.Event()
+        self._ceil_db = [-10.0] * BARS
+        self._floor_db = [-55.0] * BARS
+
+    # ------------------------------------------------------------ 장치
+
+    def _open(self):
+        """루프백 캡처를 엽니다. 실패하면 예외를 올립니다."""
+        enumerator = c_void_p()
+        hr = ole32.CoCreateInstance(byref(GUID(CLSID_MMDeviceEnumerator)), None,
+                                    CLSCTX_ALL,
+                                    byref(GUID(IID_IMMDeviceEnumerator)),
+                                    byref(enumerator))
+        if hr:
+            raise OSError("오디오 장치 목록을 얻지 못했습니다 (0x%08x)" % (hr & 0xFFFFFFFF))
+        device = c_void_p()
+        # GetDefaultAudioEndpoint(eRender=0, eConsole=0)
+        hr = _vcall(enumerator, 4, [c_uint, c_uint, POINTER(c_void_p)],
+                    0, 0, byref(device))
+        if hr:
+            _release(enumerator)
+            raise OSError("기본 출력 장치를 얻지 못했습니다 (0x%08x)" % (hr & 0xFFFFFFFF))
+        client = c_void_p()
+        hr = _vcall(device, 3, [POINTER(GUID), c_uint32, c_void_p, POINTER(c_void_p)],
+                    byref(GUID(IID_IAudioClient)), CLSCTX_ALL, None, byref(client))
+        if hr:
+            _release(device)
+            _release(enumerator)
+            raise OSError("오디오 클라이언트를 열지 못했습니다 (0x%08x)" % (hr & 0xFFFFFFFF))
+
+        capture = c_void_p()
+        fmt_ptr = POINTER(WAVEFORMATEX)()
+        try:
+            hr = _vcall(client, 8, [POINTER(POINTER(WAVEFORMATEX))], byref(fmt_ptr))
+            if hr < 0 or not fmt_ptr:
+                raise OSError("출력 장치 형식을 얻지 못했습니다 (0x%08x)"
+                              % (hr & 0xFFFFFFFF))
+            fmt = fmt_ptr.contents
+            rate, channels, block = fmt.nSamplesPerSec, fmt.nChannels, fmt.nBlockAlign
+            sample_kind = _sample_kind(fmt_ptr)
+            bytes_per_sample = 4 if sample_kind == "float32" else 2
+            if not channels or block < channels * bytes_per_sample:
+                raise OSError("출력 장치의 블록 크기가 올바르지 않습니다")
+            try:
+                hr = _vcall(client, 3, [c_uint32, c_uint32, c_uint64, c_uint64,
+                                        POINTER(WAVEFORMATEX), c_void_p],
+                            AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_LOOPBACK,
+                            BUFFER_100NS, 0, fmt_ptr, None)
+            finally:
+                # GetMixFormat의 버퍼 소유권은 호출자에게 있습니다.
+                ole32.CoTaskMemFree(ctypes.cast(fmt_ptr, c_void_p))
+                fmt_ptr = POINTER(WAVEFORMATEX)()
+            if hr < 0:
+                raise OSError("루프백 캡처를 초기화하지 못했습니다 (0x%08x)"
+                              % (hr & 0xFFFFFFFF))
+            hr = _vcall(client, 14, [POINTER(GUID), POINTER(c_void_p)],
+                        byref(GUID(IID_IAudioCaptureClient)), byref(capture))
+            if hr < 0 or not capture:
+                raise OSError("오디오 캡처 서비스를 얻지 못했습니다 (0x%08x)"
+                              % (hr & 0xFFFFFFFF))
+            hr = _vcall(client, 10, [])  # Start
+            if hr < 0:
+                raise OSError("루프백 캡처를 시작하지 못했습니다 (0x%08x)"
+                              % (hr & 0xFFFFFFFF))
+            return (enumerator, device, client, capture, rate, channels, block,
+                    sample_kind, _device_id(device))
+        except Exception:
+            if fmt_ptr:
+                ole32.CoTaskMemFree(ctypes.cast(fmt_ptr, c_void_p))
+            _release(capture)
+            _release(client)
+            _release(device)
+            _release(enumerator)
+            raise
+
+    def _close(self, session):
+        """열어 둔 COM 객체를 모두 놓습니다."""
+        enumerator, device, client, capture = session[:4]
+        try:
+            _vcall(client, 11, [])  # Stop
+        except Exception:
+            pass
+        _release(capture)
+        _release(client)
+        _release(device)
+        _release(enumerator)
+
+    def _default_id(self, enumerator):
+        """지금 윈도우가 쓰는 기본 출력 장치의 ID 를 돌려줍니다."""
+        device = c_void_p()
+        # GetDefaultAudioEndpoint(eRender=0, eConsole=0)
+        _vcall(enumerator, 4, [c_uint, c_uint, POINTER(c_void_p)], 0, 0, byref(device))
+        try:
+            return _device_id(device)
+        finally:
+            _release(device)
+
+    # ------------------------------------------------------------ 본체
+
+    def run(self):
+        hr = ole32.CoInitializeEx(None, 0)
+        if hr < 0:
+            self.error = "COM 초기화 실패 (0x%08x)" % (hr & 0xFFFFFFFF)
+            log("[소리] 시각화를 켜지 못했습니다: %s" % self.error)
+            return
+        try:
+            self._serve()
+        finally:
+            ole32.CoUninitialize()
+
+    def _serve(self):
+        """장치를 열어 캡처하다가 끊기거나 바뀌면 닫고 다시 엽니다.
+
+        실패는 처음 한 번만 기록합니다. 캡처가 실제로 이어진 뒤에야 되살아난
+        것으로 보므로, 열리자마자 끊기는 일이 되풀이되어도 기록이 쌓이지 않습니다.
+        """
+        delay = REOPEN_MIN_SEC
+        failing = False
+        reason = "start"
+        while not self.stop_event.is_set():
+            session, error, changed = None, None, False
+            try:
+                session = self._open()
+            except Exception as exc:
+                error = exc
+            if session is not None:
+                try:
+                    changed = self._capture(session, reason)
+                except Exception as exc:
+                    error = exc
+                finally:
+                    live = self.available
+                    self._close(session)
+                    self.available = False
+                    self.silent = True
+                    self.levels = [0.0] * BARS
+                if live:
+                    failing, delay = False, REOPEN_MIN_SEC
+            if error is not None:
+                self.error = str(error)
+                if not failing:
+                    failing = True
+                    if session is None:
+                        log("[소리] 시각화를 켜지 못했습니다: %s" % error)
+                    else:
+                        log("[소리] 시각화가 멈췄습니다: %s. 장치를 다시 열어 봅니다"
+                            % error)
+                reason = "failed"
+                if self.stop_event.wait(delay):
+                    break
+                delay = min(delay * 2, REOPEN_MAX_SEC)
+            elif changed:
+                reason = "changed"
+
+    def _capture(self, session, reason):
+        """캡처를 이어 갑니다. 기본 장치가 바뀌면 True, 멈추라 하면 False 입니다.
+
+        장치에서 오류가 나면 예외를 그대로 올립니다.
+        """
+        (enumerator, device, client, capture, rate, channels, block,
+         sample_kind, device_id) = session
+        _, edges, centers = band_edges(rate)
+        tilt = [TILT_DB * math.log2(c / 200.0) for c in centers]
+
+        buf = []
+        data_ptr, frames, flags = c_void_p(), c_uint32(), c_uint32()
+        pos, qpc = c_uint64(), c_uint64()
+        period = 1.0 / self.fps
+        next_at = time.perf_counter()
+        check_at = next_at + DEVICE_CHECK_SEC
+
+        while not self.stop_event.is_set():
+            self._drain(capture, buf, channels, block, sample_kind,
+                        data_ptr, frames, flags, pos, qpc)
+            if not self.available:
+                # 패킷을 한 번 꺼내 본 뒤에야 장치가 살아 있다고 봅니다.
+                self.available = True
+                self.error = ""
+                info = "%d Hz, %d 채널, %s" % (rate, channels, sample_kind)
+                if reason == "changed":
+                    detail("[소리] 기본 출력 장치가 바뀌어 새 장치로 다시 열었습니다 (%s)"
+                           % info)
+                elif reason == "failed":
+                    detail("[소리] 장치를 다시 열어 시각화를 이어 갑니다 (%s)" % info)
+                else:
+                    detail("[소리] 시각화를 시작합니다 (%s)" % info)
+            now = time.perf_counter()
+            if now >= next_at and len(buf) >= N_FFT:
+                next_at = now + period
+                self._analyze(buf[-N_FFT:], edges, tilt)
+            if now >= check_at:
+                check_at = now + DEVICE_CHECK_SEC
+                if self._default_id(enumerator) != device_id:
+                    return True
+            self.stop_event.wait(0.010)
+        return False
+
+    def _drain(self, capture, buf, channels, block, sample_kind,
+               data_ptr, frames, flags, pos, qpc):
+        """쌓인 패킷을 모두 꺼내 한 채널로 합칩니다."""
+        while True:
+            hr = _vcall(capture, 3, [POINTER(c_void_p), POINTER(c_uint32),
+                                     POINTER(c_uint32), POINTER(c_uint64),
+                                     POINTER(c_uint64)],
+                        byref(data_ptr), byref(frames), byref(flags),
+                        byref(pos), byref(qpc))
+            if hr or not frames.value:
+                break
+            count = frames.value
+            if flags.value & AUDCLNT_BUFFERFLAGS_SILENT:
+                buf.extend([0.0] * count)
+            else:
+                raw = ctypes.string_at(data_ptr, count * block)
+                code, width = ("f", 4) if sample_kind == "float32" else ("h", 2)
+                if block == channels * width:
+                    vals = struct.unpack("<%d%s" % (count * channels, code), raw)
+                else:
+                    vals = tuple(struct.unpack_from("<" + code, raw,
+                                                    frame * block + channel * width)[0]
+                                 for frame in range(count) for channel in range(channels))
+                if sample_kind == "pcm16":
+                    vals = tuple(value / 32768.0 for value in vals)
+                if channels >= 2:
+                    buf.extend((vals[i] + vals[i + 1]) * 0.5
+                               for i in range(0, len(vals), channels))
+                else:
+                    buf.extend(vals)
+            _vcall(capture, 4, [c_uint32], count)
+        # 버퍼가 무한정 자라지 않도록 최근 것만 남깁니다.
+        if len(buf) > N_FFT * 6:
+            del buf[:len(buf) - N_FFT * 2]
+
+    def _analyze(self, chunk, edges, tilt):
+        if max(chunk) < 1e-5 and min(chunk) > -1e-5:
+            # 소리가 없으면 FFT 를 돌리지 않고 막대를 천천히 내립니다.
+            self.silent = True
+            self.levels = [v - 0.06 if v > 0.06 else 0.0 for v in self.levels]
+            return
+        self.silent = False
+        # 막대가 쓰는 칸(첫 대역의 시작부터 마지막 대역의 끝까지)만 구합니다.
+        power = power_spectrum([chunk[i] * _WINDOW[i] for i in range(N_FFT)],
+                               edges[0], min(N_FFT // 2, edges[-1]) + 1)
+        out = []
+        for b in range(BARS):
+            lo = edges[b]
+            hi = min(edges[b + 1], N_FFT // 2)
+            if hi <= lo:
+                hi = lo + 1
+            mag = math.sqrt(sum(power[lo:hi]) / (hi - lo))
+            db = 20 * math.log10(mag + 1e-9) + tilt[b]
+            out.append(self._normalize(b, db))
+        self.levels = out
+
+    def _normalize(self, b, db):
+        """대역이 최근에 쓴 구간을 0~1 로 펼칩니다."""
+        ceil_db = self._ceil_db[b]
+        floor_db = self._floor_db[b]
+        # 천장은 곧바로 따라 올라가고 아주 천천히 내려옵니다.
+        ceil_db += (db - ceil_db) * (0.35 if db > ceil_db else 0.005)
+        # 바닥은 천천히 내려갑니다. 순간의 저점까지 쫓아가면 기준이 너무
+        # 낮아져서 막대가 늘 위쪽에 머뭅니다.
+        floor_db += (db - floor_db) * (0.10 if db < floor_db else 0.012)
+        self._ceil_db[b] = ceil_db
+        self._floor_db[b] = floor_db
+        span = ceil_db - floor_db
+        if span < MIN_SPAN_DB:
+            span = MIN_SPAN_DB
+        v = (db - floor_db) / span
+        if v <= 0.0:
+            return 0.0
+        if v >= 1.0:
+            return 1.0
+        return v ** 1.35
+
+    def stop(self):
+        self.stop_event.set()

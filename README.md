@@ -4,7 +4,7 @@
   <a href="https://github.com/deuxdoom/Shadowplay-Notifier/releases/latest"><img src="https://img.shields.io/github/release/deuxdoom/Shadowplay-Notifier?style=flat&logo=github&logoColor=white&label=RELEASE&labelColor=2f353a&color=0ea5e9" alt="RELEASE"></a>
   <a href="https://github.com/deuxdoom/Shadowplay-Notifier/releases"><img src="https://img.shields.io/github/downloads/deuxdoom/Shadowplay-Notifier/total?logo=github&style=flat&label=DOWNLOADS&labelColor=2f353a" alt="Downloads Total"></a>
   <a href="https://github.com/deuxdoom/Shadowplay-Notifier"><img src="https://img.shields.io/badge/PLATFORM-WINDOWS%2010%2F11-0078d4?style=flat&logo=windows&logoColor=white&labelColor=2f353a" alt="Platform"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/LICENSE-FREEWARE-22c55e?style=flat&labelColor=2f353a" alt="LICENSE"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/LICENSE-MIT-22c55e?style=flat&labelColor=2f353a" alt="LICENSE"></a>
   <a href="https://www.nvidia.com/geforce/nvidia-app/"><img src="https://img.shields.io/badge/FOR-NVIDIA%20SHADOWPLAY-76b900?style=flat&logo=nvidia&logoColor=white&labelColor=2f353a" alt="NVIDIA"></a>
 </p>
 
@@ -31,6 +31,7 @@
   <a href="#usage">다운로드 및 실행</a> &nbsp;·&nbsp;
   <a href="#backup">설정 및 백업</a> &nbsp;·&nbsp;
   <a href="#cautions">주의 사항</a> &nbsp;·&nbsp;
+  <a href="#build">소스에서 빌드</a> &nbsp;·&nbsp;
   <a href="#license">라이선스 및 저작권</a>
 </p>
 
@@ -45,8 +46,9 @@ NVIDIA App 의 녹화 상태 아이콘이 영상에 그대로 찍히는 것이 �
 대신해 **녹화 상태를 보조 모니터에 크게 표시**해 주는 Windows 앱입니다.
 
 녹화 폴더를 지켜보면서 파일이 커지는지, 파일이 쓰기로 열려 있는지를 보고 판단합니다.
-**녹화 프로그램에 끼어들지 않고 폴더를 읽기만 하므로** 어떤 녹화 도구를 쓰든 동작하며,
-녹화 결과물에는 손대지 않습니다.
+**녹화 프로그램에 끼어들지 않고 폴더를 읽기만 하므로** 녹화 결과물에는 손대지 않습니다.
+NVIDIA App(ShadowPlay)뿐 아니라 **AVerMedia Streaming Center** 와 **Veyra** 의 녹화
+폴더도 각각 지정해 함께 지켜볼 수 있습니다.
 
 녹화를 기다리는 동안에는 **시계와 날씨, 지금 듣는 음악을 보여 주는 월페이퍼 화면**이
 됩니다. 녹화가 시작되면 곧바로 녹화 화면으로 바뀌고, 끝나면 다시 돌아옵니다.
@@ -75,6 +77,9 @@ NVIDIA App 의 녹화 상태 아이콘이 영상에 그대로 찍히는 것이 �
   경과 시간의 콜론은 숫자 높이의 가운데에 맞춰 표시합니다.
 - **녹화 정보** — 저장 폴더, 파일 이름, 경과 시간, 용량, 비트레이트, 마지막으로 파일이
   커진 시각을 보여 줍니다.
+- **세 가지 녹화 프로그램** — ShadowPlay, AVerMedia Streaming Center, Veyra 의 녹화 폴더를
+  환경설정에서 따로 지정합니다. 녹화 화면 위쪽에는 ShadowPlay 는 게임 폴더 이름을,
+  AVerMedia 와 Veyra 는 프로그램 이름을 적습니다. 쓰지 않는 프로그램은 비워 두면 됩니다.
 - **빠른 반응** — 파일이 쓰기로 열려 있는지를 함께 보므로, 녹화를 시작하거나 멈추면
   폴링 주기 한 번 안에 화면에 반영됩니다.
 - **이어지는 화면 전환** — 녹화 화면과 월페이퍼가 같은 배경과 골격을 씁니다. 시계가
@@ -134,7 +139,8 @@ NVIDIA App 의 녹화 상태 아이콘이 영상에 그대로 찍히는 것이 �
 1. [Releases](https://github.com/deuxdoom/Shadowplay-Notifier/releases/latest)에서
    `ShadowPlayNotifier.exe` 를 내려받아 원하는 폴더에 둡니다.
 2. 내려받은 파일을 그대로 실행합니다. 압축을 풀 필요도, 설치 과정도 없습니다.
-3. 오른쪽 위 **환경설정**에서 NVIDIA App 의 동영상 저장 폴더를 지정하고 저장합니다.
+3. 오른쪽 위 **환경설정**에서 쓰는 녹화 프로그램(ShadowPlay, AVerMedia Streaming Center,
+   Veyra)의 저장 폴더를 지정하고 저장합니다. 쓰지 않는 프로그램의 칸은 비워 둡니다.
    환경설정 창은 프로그램이 떠 있는 보조 모니터가 아니라 주 모니터 가운데에 뜹니다.
 
 **Windows 10 이상**에서 사용합니다. 설정과 기록은 실행 파일 옆에 `config.json` 과
@@ -186,12 +192,14 @@ EXE를 교체해 다시 실행합니다. 터미널 창은 뜨지 않으며 설�
 
 환경설정 창에서 바꾼 값은 실행 파일 옆의 `config.json` 에 저장되고 곧바로 적용됩니다.
 앱을 껐다 켤 필요가 없습니다.
-`config.json`의 `dir`·`outdir`에는 여러 경로를 배열로 지정할 수도 있습니다.
-환경설정 창에서는 첫 감시 경로만 편집하며, 나머지 감시 경로와 완료본 경로는 보존합니다.
+녹화 폴더는 `config.json` 의 `dir`(ShadowPlay), `avermedia_dir`(AVerMedia Streaming Center),
+`veyra_dir`(Veyra)에 저장됩니다. 이 세 항목과 `outdir`에는 여러 경로를 배열로 지정할
+수도 있습니다. 환경설정 창에서는 프로그램마다 첫 경로만 편집하며, 나머지 경로와 완료본
+경로는 보존합니다. 칸을 비우고 저장하면 그 프로그램은 감시하지 않습니다.
 
 | 항목 | 설명 |
 | --- | --- |
-| 녹화 폴더 | 녹화 중에 파일이 커지는 폴더입니다. 하위 폴더까지 함께 봅니다. |
+| 녹화 폴더 | ShadowPlay, AVerMedia Streaming Center, Veyra 가 녹화하는 동안 파일이 커지는 폴더입니다. 하위 폴더까지 함께 보며, 적어도 하나는 지정해야 합니다. |
 | 폴링 주기 | 폴더를 훑어보는 간격입니다. 기본 0.5초입니다. |
 | 중단 판정 시간 | 파일이 커지지 않은 채 이만큼 지나면 녹화가 끝난 것으로 봅니다. |
 | 표시할 모니터 | `-1` 이면 창 크기와 같은 해상도의 모니터를 자동으로 고릅니다. |
@@ -259,21 +267,43 @@ EXE를 교체해 다시 실행합니다. 터미널 창은 뜨지 않으며 설�
 - **버그 제보 및 기능 제안:** [GitHub Issues](https://github.com/deuxdoom/Shadowplay-Notifier/issues)
 - **버전별 변경 내용:** [변경 기록](CHANGELOG.md) · [전체 릴리스](https://github.com/deuxdoom/Shadowplay-Notifier/releases)
 
+<a id="build"></a>
+
+## 🛠️ 소스에서 실행 및 빌드
+
+Windows 10 이상과 Python 3.14 에서 만들었습니다. 실행에는 표준 라이브러리와 tkinter,
+Windows API 만 쓰므로 따로 설치할 패키지가 없습니다.
+
+```
+python ShadowPlayNotifier.py
+```
+
+실행 파일은 [PyInstaller](https://pyinstaller.org/) 로 굽습니다. 빌드 설정은
+`ShadowPlayNotifier.spec` 한 곳에 있고, 완성본은 `dist\ShadowPlayNotifier.exe` 에 생깁니다.
+
+```
+pip install pyinstaller
+pyinstaller --clean --noconfirm ShadowPlayNotifier.spec
+```
+
+`--clean` 을 빼면 PyInstaller 가 이전에 만든 파일을 다시 써서 바뀐 아이콘이 반영되지
+않습니다. 모듈마다 맡은 일은 `component/__init__.py` 에 정리해 두었습니다.
+
 <a id="license"></a>
 
 <a id="-라이선스"></a>
 
 ## 📜 라이선스 및 저작권
 
-**Copyright © 2026 deuxdoom. All rights reserved.**
+**Copyright © 2026 deuxdoom.**
 
 | 항목 | 내용 |
 | --- | --- |
-| 배포 형태 | 프리웨어 (개인·업무 용도 무료) |
-| 소스 코드 | 비공개 |
+| 배포 형태 | 오픈소스 (MIT 라이선스) |
+| 소스 코드 | 공개 |
 
-- **허용:** 공식 배포처에서 받은 실행 파일을 개인·업무 용도에 관계없이 무료로 설치하고 사용할 수 있습니다. 공식 배포처 링크는 자유롭게 공유할 수 있습니다.
-- **금지:** 저작권자의 사전 서면 허락 없이 수정하거나 2차적 저작물을 만들 수 없고, 법률이 허용하는 범위를 제외하고 역설계할 수 없으며, 공식 배포처가 아닌 곳에 다시 올리거나 판매·대여할 수 없습니다.
+- **허용:** 누구나 무료로 사용·복제·수정·배포할 수 있으며, 상업적으로 이용할 수도 있습니다.
+- **조건:** 소프트웨어의 사본이나 주요 부분을 배포할 때는 저작권 표시와 MIT 라이선스 전문을 함께 넣어야 합니다. 소프트웨어는 어떠한 보증 없이 있는 그대로 제공됩니다.
 - **전문:** [LICENSE](LICENSE)
 
 ### 제3자 구성 요소
@@ -282,4 +312,4 @@ EXE를 교체해 다시 실행합니다. 터미널 창은 뜨지 않으며 설�
 
 ### 상표
 
-NVIDIA, ShadowPlay, Spotify는 각 소유자의 상표입니다. ShadowPlay Notifier는 독립적으로 만든 비공식 프로그램이며, 해당 기업과 제휴하거나 승인을 받지 않았습니다.
+NVIDIA, ShadowPlay, AVerMedia, Spotify는 각 소유자의 상표이고, Veyra는 해당 프로젝트의 이름입니다. ShadowPlay Notifier는 독립적으로 만든 비공식 프로그램이며, 해당 기업이나 프로젝트와 제휴하거나 승인을 받지 않았습니다.

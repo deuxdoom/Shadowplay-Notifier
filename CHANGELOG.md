@@ -3,6 +3,30 @@
 이 파일의 형식은 [Keep a Changelog 1.1.0](https://keepachangelog.com/ko/1.1.0/)을
 따르며, 버전은 [유의적 버전 2.0.0](https://semver.org/lang/ko/)을 따릅니다.
 
+## [2.7.4] - 2026-11-18
+
+ShadowPlay 말고도 AVerMedia Streaming Center 와 Veyra 의 녹화를 감지합니다.
+
+### 새 기능
+
+- AVerMedia Streaming Center 와 Veyra 의 녹화도 감지합니다. 환경설정에서 프로그램마다
+  녹화 폴더를 따로 지정하며, 쓰지 않는 프로그램의 칸은 비워 두면 됩니다. 판정 방식은
+  ShadowPlay 와 같아서 녹화를 시작하거나 멈추면 곧바로 화면이 바뀝니다.
+- 녹화 화면 위쪽에는 ShadowPlay 는 지금처럼 게임 폴더 이름을, AVerMedia 와 Veyra 는
+  프로그램 이름을 적습니다. 이벤트 로그의 시작 줄에도 프로그램 이름이 붙고, 맨 아래
+  줄에는 지금 녹화 중인 파일이 든 폴더를 적습니다.
+
+### 변경
+
+- 환경설정에서 ShadowPlay 녹화 폴더를 비워 둘 수 있습니다. 세 프로그램 가운데 하나
+  이상의 폴더만 지정하면 저장됩니다.
+- 음악이 나오는 동안 소리 막대를 계산하는 데 드는 CPU 사용량을 약 40% 줄였습니다.
+  막대의 움직임은 그대로입니다.
+
+[2.7.4]: https://github.com/deuxdoom/Shadowplay-Notifier/releases/tag/2.7.4
+
+---
+
 ## [2.7.3] - 2026-11-05
 
 ### 수정

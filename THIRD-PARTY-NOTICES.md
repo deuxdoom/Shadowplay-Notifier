@@ -1,12 +1,13 @@
 # Third-party notices
 
-ShadowPlay Notifier 실행 파일에는 아래 저작물이 함께 들어 있습니다. 각 저작물은
-저작권자의 라이선스를 따르며, ShadowPlay Notifier 의 [LICENSE](LICENSE) 가 그
-라이선스를 제한하지 않습니다.
+ShadowPlay Notifier 실행 파일과 이 저장소에는 아래 저작물이 함께 들어 있습니다. 각
+저작물은 저작권자의 라이선스를 따르며, ShadowPlay Notifier 의 MIT [LICENSE](LICENSE) 는
+이 저작물에 적용되지 않고 그 라이선스를 제한하지도 않습니다.
 
-The ShadowPlay Notifier executable bundles the works listed below. Each work
-remains under its own license, which the ShadowPlay Notifier [LICENSE](LICENSE)
-does not restrict.
+The ShadowPlay Notifier executable and this repository include the works listed
+below. Each work remains under its own license. The ShadowPlay Notifier MIT
+[LICENSE](LICENSE) does not apply to these works and does not restrict their
+licenses.
 
 | 저작물 | 쓰는 곳 | 라이선스 |
 | --- | --- | --- |
